@@ -90,10 +90,10 @@
             <div class="card-grid service-grid">
                 <?php
                 $services = [
-                    ["name" => "General Maintenance", "desc" => "Comprehensive diagnostics, tune-ups, and scheduled upkeep.", "icon" => ""],
-                    ["name" => "Engine Repair", "desc" => "Professional troubleshooting, rebuilding, and part replacement.", "icon" => ""],
-                    ["name" => "Precision Detailing", "desc" => "Full foam wash, degreasing, and protective coating options.", "icon" => ""],
-                    ["name" => "Electrical Services", "desc" => "Wiring diagnostics, battery checks, and light installations.", "icon" => ""]
+                    ["name" => "Premium Oil & Change Service", "desc" => "Full synthetic oil, new filter, comprehensive check-up.", "icon" => "images/featured_services/premium_oil_and_change_service.png"],
+                    ["name" => "Wheel & Tire Service", "desc" => "Mounting, precision balancing, and pressure check,", "icon" => "images/featured_services/wheel_and_tire_service.png"],
+                    ["name" => "Vehicle Washing Service", "desc" => "Complete exterior wash, foam bath, wheel cleaning, and wax finishing", "icon" => "images/featured_services/vehicle_washing_service.png"],
+                    ["name" => "Battery Service", "desc" => "Battery inspection, voltage testing, terminal cleaning, and battery replacement", "icon" => "images/featured_services/battery_service.png"]
                 ];
 
                 foreach ($services as $s) {
