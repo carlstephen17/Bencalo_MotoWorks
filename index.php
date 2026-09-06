@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bencalo MotoWorks</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles/style.css">
 </head>
 
@@ -62,9 +63,9 @@
                 <?php
                 $products = [
                     ["name" => "GIVI HPS 50.6 Stuttgart Solid Black Medium (H506FSBK)", "price" => "₱250.00", "image" => "images/featured_products/helmet.png", "featured" => false],
-                    ["name" => "MOTUL 300V 4T Factory Line 10W40 1L", "price" => "₱320.00", "image" => "", "featured" => false],
+                    ["name" => "MOTUL 300V 4T Factory Line 10W40 1L", "price" => "₱320.00", "image" => "images/featured_products/synthetic_oil.png", "featured" => false],
                     ["name" => "KOSO Side Mirror", "price" => "₱320.00", "image" => "images/featured_products/h3420_side_mirror.png", "featured" => false],
-                    ["name" => "Michelin Pilot Sport 4 225/40 ZR18 92Y XL", "price" => "₱325.00", "image" => "", "featured" => false]
+                    ["name" => "Michelin Pilot Sport 4 225/40 ZR18 92Y XL", "price" => "₱325.00", "image" => "images/featured_products/tire.webp", "featured" => false]
                 ];
 
                 foreach ($products as $p) {
@@ -136,7 +137,6 @@
             </div>
         </section>
 
-        <!-- contact-section.php -->
         <section id="contact" class="container">
             <div class="cta">
                 <div class="cta-bg">
@@ -210,7 +210,7 @@
     </section>
 
     <footer class="site-footer">
-        <div class="container">
+        <div class="container footer-container">
             <div class="footer-grid">
                 <div class="footer-brand">
                     <div class="logo">
@@ -242,22 +242,27 @@
                 <div class="footer-col footer-contact">
                     <h4>Contact Us</h4>
                     <ul>
-                        <li>Bencalo Motoworks - Bollos Street, Boyco, Bayawan City, Negros Oriental, Philippines 6221</li>
-                        <li>(123)-456-7890</li>
-                        <li>bencalomotoworks@gmail.com</li>
-                        <li>Mon-Sat: 8:00 AM – 6:00 PM,<br>Sun: CLOSED</li>
+                        <li><i class="fa-solid fa-location-dot"></i> Bencalo Motoworks - Bollos Street, Boyco, Bayawan City, Negros Oriental, Philippines 6221</li>
+                        <li><i class="fa-solid fa-phone"></i> (123)-456-7890</li>
+                        <li><i class="fa-solid fa-envelope"></i> bencalomotoworks@gmail.com</li>
+                        <li><i class="fa-solid fa-clock"></i> Mon-Sat: 8:00 AM – 6:00 PM,<br>Sun: CLOSED</li>
                     </ul>
                 </div>
             </div>
-            <div class="footer-bottom">
-                <div class="footer-bottom-inner">
-                    <p>&copy; <?php echo date("Y"); ?> BENCALO MOTOWORKS. All Rights Reserved.</p>
-                    <div class="footer-links footer-legal">
-                        <a href="#">Privacy Policy</a>
-                        <a href="#">Terms of Service</a>
-                    </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="footer-bottom-inner">
+                <p>&copy; 2026 BENCALO MOTOWORKS. All Rights Reserved.</p>
+                <div class="footer-links">
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                </div>
+                <div class="footer-social">
+                    <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
+                    <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
                 </div>
             </div>
+        </div>
     </footer>
 
 </body>
