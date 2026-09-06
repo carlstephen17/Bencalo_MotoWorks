@@ -17,7 +17,7 @@
     <header class="site-header">
         <div class="container header-inner">
             <a href="#" class="logo">
-                <img src="styles/Bencalo MotoWorks Logo.svg" alt="Bencalo MotoWorks Logo" class="logo-img">
+                <img src="images/header/Bencalo MotoWorks Logo.svg" alt="Bencalo MotoWorks Logo" class="logo-img">
             </a>
 
             <nav class="main-nav" id="main-nav">
@@ -29,8 +29,10 @@
                 </ul>
             </nav>
 
-            <div class="header-cta">
+            <div class="header-cta-group">
                 <a href="#contact" class="btn btn-primary">Book Appointment</a>
+                <a href="#login" class="btn-login-header">Log In</a>
+                <a href="#signup" class="btn-signup-header">Sign Up</a>
             </div>
 
             <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="main-nav">
@@ -43,7 +45,7 @@
 
     <main id="main-content">
         <section id="home" class="hero">
-            <img src="styles/hero_section.png" alt="Motorcycle workshop background" class="hero-bg">
+            <img src="images/hero/hero_section.png" alt="Motorcycle workshop background" class="hero-bg">
             <div class="hero-overlay"></div>
             <div class="container hero-content">
                 <h1>Your One-Stop Shop for Parts & Vehicle Care</h1>
@@ -214,7 +216,7 @@
             <div class="footer-grid">
                 <div class="footer-brand">
                     <div class="logo">
-                        <img src="styles/Bencalo MotoWorks Logo.svg" alt="Bencalo MotoWorks Logo" class="footer-logo-img">
+                        <img src="images/header/Bencalo MotoWorks Logo.svg" alt="Bencalo MotoWorks Logo" class="footer-logo-img">
                     </div>
                     <p>Expert parts and vehicle care.<br>Driven by passion.</p>
                     <ul>
