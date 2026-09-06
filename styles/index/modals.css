@@ -1,0 +1,213 @@
+/* ==========================================================================
+   AUTH & CHECKOUT MODAL BACKDROP
+   ========================================================================== */
+.auth-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-modal.active {
+  display: flex;
+}
+
+.auth-modal-content {
+  background: var(--color-bg-alt, #1e1e1e);
+  padding: 30px;
+  border-radius: var(--radius-md, 8px);
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--color-border, #333);
+}
+
+.auth-modal-content.modal-sm {
+  max-width: 480px;
+}
+
+.auth-modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text, #fff);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   MODAL HEADINGS & LAYOUTS
+   ========================================================================== */
+.modal-heading {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.modal-heading-lg {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.modal-subtitle {
+  font-size: 0.85rem;
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--color-text-muted, #aaa);
+}
+
+.product-summary-box {
+  background: var(--color-bg-alt, #1e272e);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.buy-product-name {
+  font-weight: 600;
+}
+
+.buy-product-price {
+  color: var(--color-primary, #00d2d3);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   FORM CONTROLS & INPUTS
+   ========================================================================== */
+.form-row-2col {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.form-group-mb {
+  margin-bottom: 16px;
+}
+
+.form-label-muted {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: #aaa;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 10px;
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  color: var(--color-text, #fff);
+  border-radius: var(--radius-sm, 4px);
+}
+
+.auth-input-padded {
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.auth-input-padded-r {
+  padding: 12px 40px 12px 12px;
+}
+
+.auth-input-half {
+  width: 50%;
+}
+
+.auth-input-mb {
+  margin-bottom: 12px;
+}
+
+.auth-textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  color: var(--color-text, #fff);
+  border-radius: var(--radius-sm, 4px);
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Password Toggle Field */
+.password-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.password-container.mb-sm { margin-bottom: 12px; }
+.password-container.mb-md { margin-bottom: 16px; }
+
+.password-container input {
+  width: 100%;
+  padding: 12px 40px 12px 12px;
+  background: var(--color-bg-alt);
+  border: 1px solid var(--color-primary);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+}
+
+.password-container .auth-input-padded-r {
+  padding-right: 40px;
+}
+
+.toggle-password {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.toggle-password:hover {
+  color: var(--color-primary);
+}
+
+/* Auth Options & Footer Links */
+.auth-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.auth-link-primary {
+  color: var(--color-primary, #00d2d3);
+}
+
+.auth-modal-footer {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.btn-full-width {
+  width: 100%;
+}
