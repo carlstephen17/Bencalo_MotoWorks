@@ -1,3 +1,23 @@
+<?php
+session_start();
+
+// Auto-login via Remember Me Cookie if session is not set
+if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token'])) {
+    require_once 'config.php';
+    $token = $_COOKIE['remember_token'];
+
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE remember_token = ?");
+    $stmt->execute([$token]);
+    $user = $stmt->fetch();
+
+    if ($user) {
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['first_name'] = $user['first_name'];
+        $_SESSION['role'] = $user['role'] ?? 'user';
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -12,8 +32,10 @@
 
 <body>
 
+    <!-- ==================== SKIP LINK ==================== -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
+    <!-- ==================== SITE HEADER SECTION ==================== -->
     <header class="site-header">
         <div class="container header-inner">
             <a href="#" class="logo">
@@ -31,8 +53,15 @@
 
             <div class="header-cta-group">
                 <a href="#contact" class="btn btn-primary">Book Appointment</a>
-                <a href="#login" class="btn-login-header">Log In</a>
-                <a href="#signup" class="btn-signup-header">Sign Up</a>
+                <?php if (isset($_SESSION['user_id'])): ?>
+                    <span style="font-size: 0.9rem; color: var(--color-border); font-weight: 600; margin-left: 10px;">
+                        Hello, <?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?>!
+                    </span>
+                    <a href="logout.php" class="btn-signup-header">Log Out</a>
+                <?php else: ?>
+                    <a href="#" onclick="openModal('login-modal')" class="btn-login-header">Log In</a>
+                    <a href="#" onclick="openModal('register-modal')" class="btn-signup-header">Sign Up</a>
+                <?php endif; ?>
             </div>
 
             <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="main-nav">
@@ -43,7 +72,10 @@
         </div>
     </header>
 
+    <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
     <main id="main-content">
+
+        <!-- ==================== HERO SECTION ==================== -->
         <section id="home" class="hero">
             <img src="images/hero/hero_section.png" alt="Motorcycle workshop background" class="hero-bg">
             <div class="hero-overlay"></div>
@@ -57,6 +89,7 @@
             </div>
         </section>
 
+        <!-- ==================== FEATURED PRODUCTS SECTION ==================== -->
         <section id="products" class="container">
             <div class="section-title">
                 <h2>Featured Products</h2>
@@ -72,7 +105,7 @@
 
                 foreach ($products as $p) {
                     $cardClass = $p['featured'] ? 'product-card product-card-featured' : 'product-card';
-                    $btnClass = $p['featured'] ? 'btn btn-cyan btn-block' : 'btn btn-primary btn-block';
+                    $btnClass = $p['featured'] ? 'btn btn-cyan btn-block requires-auth' : 'btn btn-primary btn-block requires-auth';
                     echo '
             <div class="' . $cardClass . '">
                 <div class="product-image"> 
@@ -87,6 +120,7 @@
             </div>
         </section>
 
+        <!-- ==================== FEATURED SERVICES SECTION ==================== -->
         <section id="services" class="container">
             <div class="section-title">
                 <h2>Featured Services</h2>
@@ -108,13 +142,14 @@
                         </div>
                         <h3 class="service-name">' . $s['name'] . '</h3>
                         <p class="service-desc">' . $s['desc'] . '</p>
-                        <a href="#" class="btn btn-primary btn-block">Book Service</a>
+                        <a href="#" class="btn btn-primary btn-block requires-auth">Book Service</a>
                     </div>';
                 }
                 ?>
             </div>
         </section>
 
+        <!-- ==================== FEATURED PROMO SECTION ==================== -->
         <section class="container">
             <div class="section-title">
                 <h2>Featured Promo</h2>
@@ -139,6 +174,7 @@
             </div>
         </section>
 
+        <!-- ==================== CONTACT / GET STARTED SECTION ==================== -->
         <section id="contact" class="container">
             <div class="cta">
                 <div class="cta-bg">
@@ -152,14 +188,15 @@
                         <p>Schedule your service appointment or order premium<br>genuine parts online in just a few clicks.</p>
                     </div>
                     <div class="cta-buttons btn-row">
-                        <a href="#" class="btn-cyan">Book Appointment</a>
-                        <a href="#" class="btn-outline">Explore Parts</a>
+                        <a href="#" class="btn-cyan requires-auth">Book Appointment</a>
+                        <a href="#products" class="btn-outline">Explore Parts</a>
                     </div>
                 </div>
             </div>
         </section>
     </main>
 
+    <!-- ==================== TESTIMONIALS SECTION ==================== -->
     <section class="container">
         <div class="section-title center">
             <h2>HERE’S THE REASON WHY YOU SHOULD CHOOSE US</h2>
@@ -211,6 +248,7 @@
         </div>
     </section>
 
+    <!-- ==================== SITE FOOTER SECTION ==================== -->
     <footer class="site-footer">
         <div class="container footer-container">
             <div class="footer-grid">
@@ -256,8 +294,8 @@
             <div class="footer-bottom-inner">
                 <p>&copy; 2026 BENCALO MOTOWORKS. All Rights Reserved.</p>
                 <div class="footer-links">
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
+                    <a href="#" class="privacy-policy">Privacy Policy</a>
+                    <a href="#" class="terms-of-service">Terms of Service</a>
                 </div>
                 <div class="footer-social">
                     <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
@@ -267,6 +305,222 @@
         </div>
     </footer>
 
+    <!-- ==================== UPDATED LOGIN MODAL SNIPPET ==================== -->
+    <div id="login-modal" class="auth-modal">
+        <div class="auth-modal-content">
+            <button class="auth-modal-close" onclick="closeModal('login-modal')">&times;</button>
+            <h2 style="margin-bottom: 24px; text-align: center;">Log In</h2>
+
+            <div id="login-message" style="font-size: 0.85rem; margin-bottom: 16px; text-align: center; font-weight: 600; display: none;"></div>
+
+            <form id="ajax-login-form" class="auth-form" action="login.php" method="POST">
+                <input type="text" name="username" placeholder="Username or Email" required autocomplete="username" class="auth-input" style="width:100%; padding:12px; margin-bottom:16px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+
+                <div class="password-container" style="position: relative; width: 100%; margin-bottom: 12px;">
+                    <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password" class="auth-input" style="width:100%; padding:12px 40px 12px 12px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password', this)" style="position: absolute; top: 50%; right: 12px; transform: translateY(-50%); background: transparent; border: none; color: var(--color-text-muted, #aaa); cursor: pointer; font-size: 0.95rem;">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+
+                <div class="auth-options" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--color-text);">
+                        <input type="checkbox" name="remember" style="cursor: pointer;"> Remember Me
+                    </label>
+                    <a href="#" onclick="switchModal('login-modal', 'forgot-modal')" class="auth-link" style="color: var(--color-primary); text-decoration: none;">Forgot Password?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block auth-btn" style="width:100%;">Log In</button>
+            </form>
+            <p class="auth-modal-footer" style="text-align: center; margin-top: 15px;">Don't have an account? <a href="#" onclick="switchModal('login-modal', 'register-modal')" class="auth-link">Register</a></p>
+        </div>
+    </div>
+
+    <!-- ==================== UPDATED REGISTER MODAL SNIPPET ==================== -->
+    <div id="register-modal" class="auth-modal">
+        <div class="auth-modal-content">
+            <button class="auth-modal-close" onclick="closeModal('register-modal')">&times;</button>
+            <h2 style="margin-bottom: 24px; text-align: center;">Create Account</h2>
+
+            <div id="register-message" style="font-size: 0.85rem; margin-bottom: 16px; text-align: center; font-weight: 600; display: none;"></div>
+
+            <form id="ajax-register-form" class="auth-form" action="register.php" method="POST">
+                <input type="text" name="username" placeholder="Username" required autocomplete="username" class="auth-input" style="width:100%; padding:10px; margin-bottom:12px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <input type="text" name="first_name" placeholder="First Name" required class="auth-input" style="width:50%; padding:10px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                    <input type="text" name="last_name" placeholder="Last Name" required class="auth-input" style="width:50%; padding:10px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                </div>
+                <input type="email" name="email" placeholder="Email Address" required autocomplete="email" class="auth-input" style="width:100%; padding:10px; margin-bottom:12px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                <input type="text" name="phone" placeholder="Phone Number" required autocomplete="tel" class="auth-input" style="width:100%; padding:10px; margin-bottom:12px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+
+                <div class="password-container" style="position: relative; width: 100%; margin-bottom: 16px;">
+                    <input type="password" id="register-password" name="password" placeholder="Password" required autocomplete="new-password" class="auth-input" style="width:100%; padding:10px 40px 10px 10px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('register-password', this)" style="position: absolute; top: 50%; right: 12px; transform: translateY(-50%); background: transparent; border: none; color: var(--color-text-muted, #aaa); cursor: pointer; font-size: 0.95rem;">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block auth-btn" style="width:100%;">Sign Up</button>
+            </form>
+            <p class="auth-modal-footer" style="text-align: center; margin-top: 15px;">Already have an account? <a href="#" onclick="switchModal('register-modal', 'login-modal')" class="auth-link">Log In</a></p>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-modal" class="auth-modal">
+        <div class="auth-modal-content">
+            <button class="auth-modal-close" onclick="closeModal('forgot-modal')">&times;</button>
+            <h2 style="margin-bottom: 16px; text-align: center;">Reset Password</h2>
+            <p style="font-size: 0.85rem; text-align: center; margin-bottom: 20px; color: var(--color-text-muted, #aaa);">Enter your account email and we'll send you recovery instructions.</p>
+
+            <div id="forgot-message" style="font-size: 0.85rem; margin-bottom: 16px; text-align: center; font-weight: 600; display: none;"></div>
+
+            <form id="ajax-forgot-form" class="auth-form" action="forgot-password.php" method="POST">
+                <input type="email" name="email" placeholder="Enter your email address" required class="auth-input" style="width:100%; padding:12px; margin-bottom:16px; background:var(--color-bg-alt); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
+                <button type="submit" class="btn btn-primary btn-block auth-btn" style="width:100%;">Send Reset Link</button>
+            </form>
+            <p class="auth-modal-footer" style="text-align: center; margin-top: 15px;"><a href="#" onclick="switchModal('forgot-modal', 'login-modal')" class="auth-link">Back to Log In</a></p>
+        </div>
+    </div>
+
+    <!-- ==================== JAVASCRIPT LOGIC SECTION ==================== -->
+    <script>
+        const isLoggedIn = <?= isset($_SESSION['user_id']) ? 'true' : 'false' ?>;
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function switchModal(closeId, openId) {
+            closeModal(closeId);
+            openModal(openId);
+        }
+
+        /* ==================== PASSWORD TOGGLE FUNCTION (Add to your JS) ==================== */
+        function togglePasswordVisibility(fieldId, btn) {
+            const passwordField = document.getElementById(fieldId);
+            const icon = btn.querySelector('i');
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordField.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Require login handling for restricted buttons
+            document.querySelectorAll('.requires-auth').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    if (!isLoggedIn) {
+                        e.preventDefault();
+                        openModal('login-modal');
+                    }
+                });
+            });
+
+            // Close modal when clicking on the blurred backdrop
+            window.addEventListener('click', function(e) {
+                if (e.target.classList.contains('auth-modal')) {
+                    e.target.classList.remove('active');
+                }
+            });
+
+            // AJAX Login Submission
+            const loginForm = document.getElementById('ajax-login-form');
+            if (loginForm) {
+                loginForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(loginForm);
+                    const msgDiv = document.getElementById('login-message');
+
+                    fetch('login.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            msgDiv.style.display = 'block';
+                            msgDiv.style.color = data.success ? '#4cd137' : '#ff6b6b';
+                            msgDiv.textContent = data.message;
+                            if (data.success) {
+                                setTimeout(() => window.location.reload(), 1000);
+                            }
+                        })
+                        .catch(() => {
+                            msgDiv.style.display = 'block';
+                            msgDiv.style.color = '#ff6b6b';
+                            msgDiv.textContent = "An error occurred. Please try again.";
+                        });
+                });
+            }
+
+            // AJAX Register Submission
+            const registerForm = document.getElementById('ajax-register-form');
+            if (registerForm) {
+                registerForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(registerForm);
+                    const msgDiv = document.getElementById('register-message');
+
+                    fetch('register.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            msgDiv.style.display = 'block';
+                            msgDiv.style.color = data.success ? '#4cd137' : '#ff6b6b';
+                            msgDiv.textContent = data.message;
+                            if (data.success) {
+                                setTimeout(() => switchModal('register-modal', 'login-modal'), 1500);
+                            }
+                        })
+                        .catch(() => {
+                            msgDiv.style.display = 'block';
+                            msgDiv.style.color = '#ff6b6b';
+                            msgDiv.textContent = "An error occurred. Please try again.";
+                        });
+                });
+            }
+
+            // AJAX Forgot Password Submission
+            const forgotForm = document.getElementById('ajax-forgot-form');
+            if (forgotForm) {
+                forgotForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(forgotForm);
+                    const msgDiv = document.getElementById('forgot-message');
+
+                    fetch('forgot_password.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            msgDiv.style.display = 'block';
+                            msgDiv.style.color = data.success ? '#4cd137' : '#ff6b6b';
+                            msgDiv.textContent = data.message;
+                            if (data.success) {
+                                forgotForm.reset();
+                            }
+                        })
+                        .catch(() => {
+                            msgDiv.style.display = 'block';
+                            msgDiv.style.color = '#ff6b6b';
+                            msgDiv.textContent = "An error occurred. Please try again.";
+                        });
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>
