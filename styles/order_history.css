@@ -1,0 +1,163 @@
+/* ==================== FULL-SIZE ORDER HISTORY & EDIT MODAL ==================== */
+.history-wrapper {
+    width: 100%;
+    min-height: 80vh;
+    padding: 40px 5%;
+    box-sizing: border-box;
+}
+
+.history-container {
+    width: 100%;
+    background: #111827;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    border: 1px solid #1f2937;
+    box-sizing: border-box;
+    color: #e5e7eb;
+}
+
+.history-container h2 {
+    color: #38bdf8;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+}
+
+.history-alert {
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+.history-alert-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+.history-alert-error { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
+
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    overflow: hidden;
+    border-radius: 8px;
+}
+.styled-table thead tr {
+    background: #1f2937;
+    color: #38bdf8;
+    text-align: left;
+    font-weight: 600;
+}
+.styled-table th, .styled-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #374151;
+}
+.styled-table tbody tr:hover {
+    background: rgba(55, 65, 81, 0.4);
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.badge-pending { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }
+.badge-completed { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+
+.btn-action {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+.btn-edit { background: #0284c7; color: #fff; }
+.btn-edit:hover { background: #0369a1; }
+.btn-cancel { background: #dc2626; color: #fff; }
+.btn-cancel:hover { background: #b91c1c; }
+
+.back-link {
+    display: inline-block;
+    margin-top: 25px;
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 500;
+}
+.back-link:hover { text-decoration: underline; }
+
+/* Modal Overlay Styling */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.modal-card {
+    background: #1f2937;
+    width: 100%;
+    max-width: 500px;
+    padding: 30px;
+    border-radius: 12px;
+    border: 1px solid #374151;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    position: relative;
+    color: #e5e7eb;
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.modal-header h3 { color: #38bdf8; margin: 0; font-size: 1.4rem; }
+.modal-close {
+    background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer;
+}
+.modal-close:hover { color: #fff; }
+
+.modal-form-group {
+    margin-bottom: 15px;
+}
+.modal-form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: #d1d5db;
+}
+.modal-form-control {
+    width: 100%;
+    padding: 10px 12px;
+    background: #111827;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+.modal-form-control:focus {
+    outline: none;
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+.btn-modal-secondary {
+    background: #4b5563; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+}
+.btn-modal-secondary:hover { background: #374151; }
+.btn-modal-primary {
+    background: #0284c7; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600;
+}
+.btn-modal-primary:hover { background: #0369a1; }
