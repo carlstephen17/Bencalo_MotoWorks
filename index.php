@@ -28,6 +28,21 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token']) && isset($
     }
 }
 
+// Fetch Logged-in User's Phone Number for Checkout Autofill
+$user_phone = '';
+if (isset($_SESSION['user_id']) && isset($pdo)) {
+    try {
+        $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $userData = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($userData && !empty($userData['phone'])) {
+            $user_phone = $userData['phone'];
+        }
+    } catch (Exception $e) {
+        // Fallback silently if query fails
+    }
+}
+
 // Calculate shopping cart total items count
 $cart_count = 0;
 if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
@@ -89,396 +104,76 @@ if (empty($services)) {
     <link rel="stylesheet" href="styles/index/layout.css">
     <link rel="stylesheet" href="styles/index/components.css">
     <link rel="stylesheet" href="styles/index/modals.css">
+    <style>
+        /* Inline style for modal alert boxes */
+        .modal-alert {
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .modal-alert.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .modal-alert.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+    </style>
 </head>
 
 <body>
 
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
-    <!-- Toast Notifications Container -->
-    <div id="toast-container" class="toast-container"></div>
-
     <!-- ==================== SITE HEADER SECTION ==================== -->
-    <header class="site-header">
-        <div class="container header-inner">
-            <a href="#" class="logo">
-                <img src="images/header/Bencalo MotoWorks Logo.svg" alt="Bencalo MotoWorks Logo" class="logo-img">
-            </a>
-
-            <nav class="main-nav" id="main-nav">
-                <ul>
-                    <li><a href="#home">Home</a></li>
-                    <li><a href="shop.php">Shop</a></li>
-                    <li><a href="#services">Services</a></li>
-                    <li><a href="#about">About Us</a></li>
-                    <li><a href="#contact">Contact</a></li>
-                </ul>
-            </nav>
-
-            <div class="header-cta-group">
-                <a href="cart.php" class="cart-link-icon" aria-label="Shopping Cart">
-                    <i class="fa-solid fa-cart-shopping"></i>
-                    <span class="cart-badge" id="cart-count-badge"><?= $cart_count ?></span>
-                </a>
-
-                <a href="booking.php" class="btn btn-primary">Book Appointment</a>
-
-                <?php if (isset($_SESSION['user_id'])): ?>
-                    <div class="user-dropdown">
-                        <button class="btn-signup-header">
-                            Hello, <?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?> <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                        <div class="user-menu">
-                            <a href="profile.php"><i class="fa-solid fa-user"></i> My Profile</a>
-                            <a href="my-appointments.php"><i class="fa-solid fa-calendar-check"></i> Appointments</a>
-                            <a href="my-orders.php"><i class="fa-solid fa-box"></i> Order History</a>
-                            <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Log Out</a>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <a href="#" onclick="openModal('login-modal')" class="btn-login-header">Log In</a>
-                    <a href="#" onclick="openModal('register-modal')" class="btn-signup-header">Sign Up</a>
-                <?php endif; ?>
-            </div>
-
-            <button class="nav-toggle" id="nav-toggle-btn" aria-label="Toggle navigation" aria-expanded="false" aria-controls="main-nav">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-    </header>
+    <?php require_once 'components/header.php'; ?>
 
     <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
+
     <main id="main-content">
 
         <!-- ==================== HERO SECTION ==================== -->
-        <section id="home" class="hero">
-            <img src="images/hero/hero_section.png" alt="Motorcycle workshop background" class="hero-bg">
-            <div class="hero-overlay"></div>
-            <div class="container hero-content">
-                <h1>Your One-Stop Shop for Parts & Vehicle Care</h1>
-                <p>Buy genuine auto parts online and schedule maintenance, repairs, or vehicle washing all in one place.</p>
-                <div class="btn-row">
-                    <a href="shop.php" class="btn btn-primary">Shop Now</a>
-                    <a href="#services" class="btn btn-outline">Browse Services</a>
-                </div>
-            </div>
-        </section>
+        <?php require_once 'components/hero.php'; ?>
 
-        <!-- ==================== FEATURED PRODUCTS SECTION ==================== -->
-        <section id="products" class="container section-padding-top">
-            <div class="section-title">
-                <h2>Featured Products</h2>
-            </div>
-
-            <!-- Instant Search Filter -->
-            <div class="search-bar-container">
-                <input type="text" id="product-search-input" class="search-input-field" placeholder="Search products by name...">
-            </div>
-
-            <div class="card-grid product-grid" id="product-grid-container">
-                <?php foreach ($products as $p): 
-                    $priceFormatted = is_numeric($p['price']) ? '₱' . number_format($p['price'], 2) : $p['price'];
-                    $isFeatured = !empty($p['featured']);
-                    $cardClass = $isFeatured ? 'product-card product-card-featured' : 'product-card';
-                    $btnClass = $isFeatured ? 'btn btn-cyan btn-block' : 'btn btn-primary btn-block';
-                ?>
-                    <div class="<?= $cardClass ?>" data-name="<?= strtolower(htmlspecialchars($p['name'])) ?>">
-                        <div class="product-image"> 
-                            <img src="<?= htmlspecialchars($p['image']) ?>" alt="<?= htmlspecialchars($p['name']) ?>">
-                        </div>
-                        <h3 class="product-name"><?= htmlspecialchars($p['name']) ?></h3>
-                        <div class="product-price"><?= $priceFormatted ?></div>
-                        <div class="product-card-actions">
-                            <button onclick="addToCart(<?= $p['id'] ?>)" class="btn btn-outline btn-block btn-cart-icon"><i class="fa-solid fa-cart-plus"></i></button>
-                            <button type="button" onclick="openBuyModal(<?= $p['id'] ?>, '<?= addslashes(htmlspecialchars($p['name'], ENT_QUOTES)) ?>', <?= is_numeric($p['price']) ? $p['price'] : 0 ?>)" class="<?= $btnClass ?>">Buy Now</button>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </section>
+        <!-- ==================== SITE FEATURED PRODUCTS SECTION ==================== -->
+        <?php require_once 'components/featured_products.php'; ?>
 
         <!-- ==================== FEATURED SERVICES SECTION ==================== -->
-        <section id="services" class="container section-padding-top">
-            <div class="section-title">
-                <h2>Featured Services</h2>
-            </div>
-            <div class="card-grid service-grid">
-                <?php foreach ($services as $s): ?>
-                    <div class="service-card">
-                        <div class="service-icon">
-                            <img src="<?= htmlspecialchars($s['icon']) ?>" alt="<?= htmlspecialchars($s['name']) ?>">
-                        </div>
-                        <h3 class="service-name"><?= htmlspecialchars($s['name']) ?></h3>
-                        <p class="service-desc"><?= htmlspecialchars($s['desc']) ?></p>
-                        <a href="booking.php?service_id=<?= $s['id'] ?>" class="btn btn-primary btn-block requires-auth">Book Service</a>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </section>
+        <?php require_once 'components/featured_services.php'; ?>
 
         <!-- ==================== FEATURED PROMO SECTION ==================== -->
-        <section class="container section-padding-top">
-            <div class="section-title">
-                <h2>Featured Promo</h2>
-            </div>
-            <div class="promo-card">
-                <div class="promo-image-bg">
-                    <img src="images/featured_promo/featured_promo_image.jpg" alt="Featured Promo">
-                </div>
-                <div class="promo-overlay"></div>
-                <div class="promo-content">
-                    <h2>BUNDLE & SAVE: GET 15% OFF <br>WHEN YOU BUY PARTS + SERVICE.</h2>
-                    <ul class="promo-list">
-                        <li>Includes genuine parts.</li>
-                        <li>Expert installation and services.</li>
-                        <li>15% total savings.</li>
-                        <li>Applicable to all makes & models.</li>
-                    </ul>
-                    <div class="promo-actions">
-                        <a href="promos.php" class="btn btn-primary">VIEW ALL PROMOS</a>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <?php require_once 'components/featured_promo.php'; ?>
 
-        <!-- ==================== CONTACT / GET STARTED SECTION ==================== -->
-        <section id="contact" class="container section-padding-top">
-            <div class="cta">
-                <div class="cta-bg">
-                    <img src="images/get_started/get_started_car.avif" alt="Workshop background">
-                </div>
-                <div class="cta-overlay"></div>
-                <div class="cta-content">
-                    <div class="cta-text">
-                        <span class="eyebrow">Get Started</span>
-                        <h2>READY TO UPGRADE<br>YOUR RIDE?</h2>
-                        <p>Schedule your service appointment or order premium<br>genuine parts online in just a few clicks.</p>
-                    </div>
-                    <div class="cta-buttons btn-row">
-                        <a href="booking.php" class="btn-cyan requires-auth">Book Appointment</a>
-                        <a href="shop.php" class="btn-outline">Explore Parts</a>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- ==================== GET STARTED SECTION ==================== -->
+        <?php require_once 'components/get_started.php'; ?>
+
     </main>
 
     <!-- ==================== TESTIMONIALS SECTION ==================== -->
-    <section id="about" class="container section-padding-y">
-        <div class="section-title center">
-            <h2>HERE’S THE REASON WHY YOU SHOULD CHOOSE US</h2>
-        </div>
-        <div class="card-grid testimonial-grid">
-            <?php
-            $testimonials = [
-                ["name" => "Robert Smith", "location" => "Washington, D.C.", "text" => "Great service every time! Friendly and the mechanics always explain what they are doing. Trustworthy and reliable.", "image" => "images/testimonials/testimonial_1.png"],
-                ["name" => "Emily Johnson", "location" => "San Francisco, California", "text" => "Saved me a lot of trouble! They diagnosed an engine issue that another shop couldn't fix. Excellent technical knowledge.", "image" => "images/testimonials/testimonial_2.png"],
-                ["name" => "Alice Johnson", "location" => "Los Angeles, California", "text" => "Bencalo Motoworks is my go-to place for maintenance. They always use quality parts, and my car runs like a dream. Highly recommended!", "image" => "images/testimonials/testimonial_3.png"],
-                ["name" => "John Doe", "location" => "Washington, D.C.", "text" => "Ordering parts through their website was seamless, and the delivery was quick. The parts are exact and exactly what I needed.", "image" => "images/testimonials/testimonial_4.png"]
-            ];
+    <?php require_once 'components/testimonials.php'; ?>
 
-            foreach ($testimonials as $t): ?>
-                <div class="testimonial-card">
-                    <div class="testimonial-header">
-                        <img src="<?= htmlspecialchars($t['image']) ?>" alt="<?= htmlspecialchars($t['name']) ?>" class="testimonial-avatar">
-                        <div class="testimonial-meta">
-                            <h3 class="testimonial-name"><?= htmlspecialchars($t['name']) ?></h3>
-                            <div class="testimonial-location"><?= htmlspecialchars($t['location']) ?></div>
-                        </div>
-                    </div>
-                    <div class="stars">★★★★★</div>
-                    <p class="testimonial-text">"<?= htmlspecialchars($t['text']) ?>"</p>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </section>
 
     <!-- ==================== SITE FOOTER SECTION ==================== -->
-    <footer class="site-footer">
-        <div class="container footer-container">
-            <div class="footer-grid">
-                <div class="footer-brand">
-                    <div class="logo">
-                        <img src="images/header/Bencalo MotoWorks Logo.svg" alt="Bencalo MotoWorks Logo" class="footer-logo-img">
-                    </div>
-                    <p>Expert parts and vehicle care.<br>Driven by passion.</p>
-                    <ul>
-                        <li><a href="#about">Our Team</a></li>
-                        <li><a href="#about">About Us</a></li>
-                    </ul>
-                </div>
-                <div class="footer-col">
-                    <h4>Maintenance Guides</h4>
-                    <ul>
-                        <li><a href="#">5 Signs Your Battery is Failing</a></li>
-                        <li><a href="#">Importance of Oil Changes</a></li>
-                        <li><a href="#">Proper Tire Inflation Guide</a></li>
-                        <li><a href="#">Cooling System Maintenance</a></li>
-                    </ul>
-                </div>
-                <div class="footer-col">
-                    <h4>Customer Support</h4>
-                    <ul>
-                        <li><a href="profile.php">My Account</a></li>
-                        <li><a href="#">FAQ</a></li>
-                        <li><a href="#">Terms & Conditions</a></li>
-                    </ul>
-                </div>
-                <div class="footer-col footer-contact">
-                    <h4>Contact Us</h4>
-                    <ul>
-                        <li><i class="fa-solid fa-location-dot"></i> Bencalo Motoworks - Bollos Street, Boyco, Bayawan City, Negros Oriental, Philippines 6221</li>
-                        <li><i class="fa-solid fa-phone"></i> (123)-456-7890</li>
-                        <li><i class="fa-solid fa-envelope"></i> bencalomotoworks@gmail.com</li>
-                        <li><i class="fa-solid fa-clock"></i> Mon-Sat: 8:00 AM – 6:00 PM,<br>Sun: CLOSED</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            <div class="footer-bottom-inner">
-                <p>&copy; <?= date('Y') ?> BENCALO MOTOWORKS. All Rights Reserved.</p>
-                <div class="footer-links">
-                    <a href="#" class="privacy-policy">Privacy Policy</a>
-                    <a href="#" class="terms-of-service">Terms of Service</a>
-                </div>
-                <div class="footer-social">
-                    <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook"></i></a>
-                    <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-                </div>
-            </div>
-        </div>
-    </footer>
+    <?php require_once 'components/footer.php'; ?>
 
     <!-- ==================== BUY NOW / CHECKOUT MODAL ==================== -->
-    <div id="buy-modal" class="auth-modal">
-        <div class="auth-modal-content modal-sm">
-            <button class="auth-modal-close" onclick="closeModal('buy-modal')">&times;</button>
-            <h2 class="modal-heading">Complete Your Order</h2>
-            
-            <div id="buy-modal-product-summary" class="product-summary-box">
-                <div class="buy-product-name" id="buy-product-name">Product Name</div>
-                <div class="buy-product-price" id="buy-product-price">₱0.00</div>
-            </div>
+    <?php require_once 'components/modals.php'; ?>
 
-            <form id="ajax-buy-form" class="auth-form" action="process_checkout.php" method="POST">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="hidden" name="product_id" id="buy-product-id">
-                
-                <div class="form-row-2col">
-                    <input type="text" name="full_name" placeholder="Full Name" required class="auth-input auth-input-half" value="<?= htmlspecialchars($_SESSION['first_name'] ?? '') ?>">
-                    <input type="tel" name="phone" placeholder="Phone Number" required class="auth-input auth-input-half">
-                </div>
 
-                <textarea name="shipping_address" placeholder="Shipping Address" required class="auth-input auth-textarea"></textarea>
 
-                <div class="form-group-mb">
-                    <label class="form-label-muted">Payment Method:</label>
-                    <select name="payment_method" required class="auth-input">
-                        <option value="cod">Cash on Delivery (COD)</option>
-                        <option value="gcash">GCash / E-Wallet</option>
-                        <option value="card">Credit / Debit Card</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Place Order</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- ==================== LOGIN MODAL ==================== -->
-    <div id="login-modal" class="auth-modal">
-        <div class="auth-modal-content">
-            <button class="auth-modal-close" onclick="closeModal('login-modal')">&times;</button>
-            <h2 class="modal-heading-lg">Log In</h2>
-
-            <form id="ajax-login-form" class="auth-form" action="login.php" method="POST">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="text" name="username" placeholder="Username or Email" required autocomplete="username" class="auth-input auth-input-padded">
-
-                <div class="password-container mb-sm">
-                    <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password" class="auth-input auth-input-padded-r">
-                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password', this)">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                </div>
-
-                <div class="auth-options">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="remember"> Remember Me
-                    </label>
-                    <a href="#" onclick="switchModal('login-modal', 'forgot-modal')" class="auth-link auth-link-primary">Forgot Password?</a>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Log In</button>
-            </form>
-            <p class="auth-modal-footer">Don't have an account? <a href="#" onclick="switchModal('login-modal', 'register-modal')" class="auth-link">Register</a></p>
-        </div>
-    </div>
-
-    <!-- ==================== REGISTER MODAL ==================== -->
-    <div id="register-modal" class="auth-modal">
-        <div class="auth-modal-content">
-            <button class="auth-modal-close" onclick="closeModal('register-modal')">&times;</button>
-            <h2 class="modal-heading-lg">Create Account</h2>
-
-            <form id="ajax-register-form" class="auth-form" action="register.php" method="POST">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="text" name="username" placeholder="Username" required autocomplete="username" class="auth-input auth-input-mb">
-                <div class="form-row-2col">
-                    <input type="text" name="first_name" placeholder="First Name" required class="auth-input auth-input-half">
-                    <input type="text" name="last_name" placeholder="Last Name" required class="auth-input auth-input-half">
-                </div>
-                <input type="email" name="email" placeholder="Email Address" required autocomplete="email" class="auth-input auth-input-mb">
-                <input type="text" name="phone" placeholder="Phone Number" required autocomplete="tel" class="auth-input auth-input-mb">
-
-                <div class="password-container mb-md">
-                    <input type="password" id="register-password" name="password" placeholder="Password" required autocomplete="new-password" class="auth-input auth-input-padded-r">
-                    <button type="button" class="toggle-password" onclick="togglePasswordVisibility('register-password', this)">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Sign Up</button>
-            </form>
-            <p class="auth-modal-footer">Already have an account? <a href="#" onclick="switchModal('register-modal', 'login-modal')" class="auth-link">Log In</a></p>
-        </div>
-    </div>
-
-    <!-- ==================== FORGOT PASSWORD MODAL ==================== -->
-    <div id="forgot-modal" class="auth-modal">
-        <div class="auth-modal-content">
-            <button class="auth-modal-close" onclick="closeModal('forgot-modal')">&times;</button>
-            <h2 class="modal-heading">Reset Password</h2>
-            <p class="modal-subtitle">Enter your email address to receive password reset instructions.</p>
-
-            <form id="ajax-forgot-form" class="auth-form" action="forgot-password.php" method="POST">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="email" name="email" placeholder="Enter your email address" required class="auth-input auth-input-padded">
-                <button type="submit" class="btn btn-primary btn-block auth-btn btn-full-width">Send Reset Link</button>
-            </form>
-            <p class="auth-modal-footer"><a href="#" onclick="switchModal('forgot-modal', 'login-modal')" class="auth-link">Back to Log In</a></p>
-        </div>
-    </div>
 
     <!-- ==================== JAVASCRIPT LOGIC SECTION ==================== -->
     <script>
         const isLoggedIn = <?= isset($_SESSION['user_id']) ? 'true' : 'false' ?>;
-
-        /* Toast Notifications */
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `<span>${message}</span><i class="fa-solid fa-xmark toast-close-icon" onclick="this.parentElement.remove()"></i>`;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
-        }
 
         /* Modal Functions */
         function openModal(modalId) {
@@ -487,6 +182,12 @@ if (empty($services)) {
 
         function closeModal(modalId) {
             document.getElementById(modalId).classList.remove('active');
+            // Clear alerts when closing modal
+            const alertBox = document.getElementById(modalId + '-alert');
+            if (alertBox) {
+                alertBox.className = 'modal-alert';
+                alertBox.textContent = '';
+            }
         }
 
         function switchModal(closeId, openId) {
@@ -494,10 +195,18 @@ if (empty($services)) {
             openModal(openId);
         }
 
+        /* Show alert inside a specific modal */
+        function showModalAlert(modalId, message, type = 'error') {
+            const alertBox = document.getElementById(modalId + '-alert');
+            if (alertBox) {
+                alertBox.textContent = message;
+                alertBox.className = 'modal-alert ' + type;
+            }
+        }
+
         /* Open Buy Modal Flow */
         function openBuyModal(productId, productName, productPrice) {
             if (!isLoggedIn) {
-                showToast("Please log in to continue with your purchase.", "info");
                 openModal('login-modal');
                 return;
             }
@@ -523,23 +232,36 @@ if (empty($services)) {
         /* Add To Cart AJAX */
         function addToCart(productId) {
             fetch('cart_action.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=add&product_id=${productId}&csrf_token=<?= $_SESSION['csrf_token'] ?>`
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showToast("Product added to cart!", "success");
-                    document.getElementById('cart-count-badge').textContent = data.cart_count;
-                } else {
-                    showToast(data.message || "Failed to add product.", "error");
-                }
-            })
-            .catch(() => showToast("Item added to cart session.", "info"));
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `action=add&product_id=${productId}&csrf_token=<?= $_SESSION['csrf_token'] ?>`
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('cart-count-badge').textContent = data.cart_count;
+                    }
+                })
+                .catch(() => {});
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+
+            /* Auto-detect active navigation link and apply underline transfer */
+            const currentPath = window.location.pathname.split("/").pop();
+            const navLinks = document.querySelectorAll(".main-nav a, .header-nav-link");
+            navLinks.forEach(link => {
+                const linkHref = link.getAttribute("href");
+                if (!linkHref) return;
+                const linkPage = linkHref.split("/").pop();
+                if (linkPage === currentPath || (currentPath === "" && (linkPage === "index.php" || linkPage === ""))) {
+                    link.classList.add("active");
+                } else {
+                    link.classList.remove("active");
+                }
+            });
 
             /* Mobile Navigation Menu Toggle */
             const navToggleBtn = document.getElementById('nav-toggle-btn');
@@ -570,8 +292,8 @@ if (empty($services)) {
                 button.addEventListener('click', function(e) {
                     if (!isLoggedIn) {
                         e.preventDefault();
-                        showToast("Please log in to continue.", "info");
                         openModal('login-modal');
+                        showModalAlert('login-modal', 'Please log in to continue.', 'error');
                     }
                 });
             });
@@ -580,10 +302,16 @@ if (empty($services)) {
             window.addEventListener('click', function(e) {
                 if (e.target.classList.contains('auth-modal')) {
                     e.target.classList.remove('active');
+                    // Clear alerts
+                    const alertBox = e.target.querySelector('.modal-alert');
+                    if (alertBox) {
+                        alertBox.className = 'modal-alert';
+                        alertBox.textContent = '';
+                    }
                 }
             });
 
-            /* Generic AJAX Form Submit Handler */
+            /* Generic AJAX Form Submit Handler with Modal Error Messages */
             function handleFormSubmit(formId, endpoint, modalId) {
                 const form = document.getElementById(formId);
                 if (form) {
@@ -591,22 +319,26 @@ if (empty($services)) {
                         e.preventDefault();
                         const formData = new FormData(form);
 
-                        fetch(endpoint, { method: 'POST', body: formData })
+                        fetch(endpoint, {
+                                method: 'POST',
+                                body: formData
+                            })
                             .then(res => res.json())
                             .then(data => {
                                 if (data.success) {
-                                    showToast(data.message, "success");
-                                    if (modalId) closeModal(modalId);
+                                    showModalAlert(modalId, data.message || 'Success!', 'success');
                                     if (data.redirect) {
                                         setTimeout(() => window.location.href = data.redirect, 1000);
                                     } else {
                                         setTimeout(() => window.location.reload(), 1000);
                                     }
                                 } else {
-                                    showToast(data.message || "An error occurred.", "error");
+                                    showModalAlert(modalId, data.message || 'An error occurred.', 'error');
                                 }
                             })
-                            .catch(() => showToast("Request failed. Please try again.", "error"));
+                            .catch(() => {
+                                showModalAlert(modalId, 'Request failed. Please try again.', 'error');
+                            });
                     });
                 }
             }
