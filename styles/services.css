@@ -122,7 +122,8 @@
 }
 
 /* Main Content & Search */
-.main-content-shop {
+.main-content-shop,
+.main-content-services {
   padding-top: 100px;
   padding-bottom: 60px;
 }
@@ -143,14 +144,137 @@
   color: #fff;
 }
 
-.product-card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
+/* Grid & Card Uniform Sizing (Matching Shop & Services) */
+.products-grid,
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
-.btn-cart-add {
-  padding: 10px;
+.product-card,
+.service-card {
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  border-radius: var(--radius-sm, 6px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.product-card-image-container,
+.service-card-image-container {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 6px);
+  margin-bottom: 12px;
+  background: #121212;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-card-image-container img,
+.service-card-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-card-info,
+.service-card-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* ==========================================================
+   STRICT ACTION BUTTON FIX (Equal 50/50 Split Side-by-Side)
+   ================================================---------- */
+.product-card-actions {
+  display: flex !important;
+  gap: 10px !important;
+  margin-top: 15px !important;
+  width: 100% !important;
+  align-items: center !important;
+}
+
+/* Cart Button: Outline Only (White -> Cyan on Hover) */
+.product-card-actions .btn-cart-add,
+.product-card-actions a.btn-cart-add,
+.product-card-actions button.btn-cart-add {
+  background: transparent !important;
+  color: #fff !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 50px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 42px !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.product-card-actions .btn-cart-add i,
+.product-card-actions a.btn-cart-add i,
+.product-card-actions button.btn-cart-add i {
+  color: inherit !important;
+  font-size: 1rem !important;
+  transition: color 0.2s ease !important;
+}
+
+/* Hover: Pure Outline & Icon Cyan (Transparent Background) */
+.product-card-actions .btn-cart-add:hover,
+.product-card-actions a.btn-cart-add:hover,
+.product-card-actions button.btn-cart-add:hover {
+  background: transparent !important;
+  border-color: #00b4d8 !important;
+  color: #00b4d8 !important;
+}
+
+.product-card-actions .btn-cart-add:hover i,
+.product-card-actions a.btn-cart-add:hover i,
+.product-card-actions button.btn-cart-add:hover i {
+  color: #00b4d8 !important;
+}
+
+/* Book / Buy Now Button: Dark Blue Pill taking 50% width */
+.product-card-actions .btn-book-appointment,
+.product-card-actions .btn-buy-now {
+  background: #08234e !important;
+  color: #f3f4e4 !important;
+  border: 1px solid #08234e !important;
+  border-radius: 50px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 42px !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  font-weight: 600 !important;
+  font-size: 0.9rem !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  padding: 0 16px !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Cyan highlight applied strictly on hover */
+.product-card-actions .btn-book-appointment:hover,
+.product-card-actions .btn-buy-now:hover {
+  background: #00b4d8 !important;
+  color: #121212 !important;
+  border-color: #00b4d8 !important;
 }
 
 /* Modal Form Styles */
@@ -422,59 +546,4 @@ main .auth-submit-btn:hover,
 #service-booking-modal textarea::placeholder,
 #service-booking-modal input::placeholder {
   color: var(--color-text-muted, #aaa);
-}
-
-/* Style for Book Appointment button (solid dark blue, hover cyan) */
-.product-card-actions .btn-book-appointment {
-    background: #08234e !important;
-    color: #f3f4e4 !important;
-    font-weight: 600;
-    padding: 12px;
-    border: 1px solid #08234e !important;
-    border-radius: var(--radius-sm, 6px);
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.product-card-actions .btn-book-appointment:hover {
-    background: #00b4d8 !important;
-    color: #121212 !important;
-    border-color: #00b4d8 !important;
-}
-
-/* Style for Add to Cart button (Permanent Outline, Cyan border/icon on hover) */
-.product-card-actions a.btn,
-.product-card-actions button.btn-cart-add {
-    background: transparent !important;
-    color: #fff !important;
-    font-weight: 600;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: var(--radius-sm, 6px);
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    transition: border-color 0.2s ease, color 0.2s ease;
-}
-
-.product-card-actions a.btn i,
-.product-card-actions button.btn-cart-add i {
-    color: inherit;
-    transition: color 0.2s ease;
-}
-
-.product-card-actions a.btn:hover,
-.product-card-actions button.btn-cart-add:hover {
-    background: transparent !important;
-    border-color: #00d2d3 !important;
-    color: var(--color-primary, #00d2d3) !important;
-}
-
-.product-card-actions a.btn:hover i,
-.product-card-actions button.btn-cart-add:hover i {
-    color: #00d2d3 !important;
 }

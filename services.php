@@ -159,7 +159,7 @@ if (isset($pdo)) {
                 $priceFormatted = is_numeric($s['price']) ? '₱' . number_format($s['price'], 2) : $s['price'];
                 $isFeatured = !empty($s['featured']);
                 $cardClass = $isFeatured ? 'product-card product-card-featured' : 'product-card';
-                $btnClass = $isFeatured ? 'btn btn-cyan btn-block' : 'btn btn-primary btn-block';
+                $btnClass = $isFeatured ? 'btn btn-cyan' : 'btn btn-primary';
             ?>
                 <div class="<?= $cardClass ?>" data-name="<?= strtolower(htmlspecialchars($s['name'])) ?>">
                     <div class="product-image">
@@ -168,7 +168,7 @@ if (isset($pdo)) {
                     <h3 class="product-name"><?= htmlspecialchars($s['name']) ?></h3>
                     <div class="product-price"><?= $priceFormatted ?></div>
                     <div class="product-card-actions">
-                        <button onclick="addToCart(<?= $s['id'] ?>)" class="btn btn-outline btn-block btn-cart-add"><i class="fa-solid fa-cart-plus"></i></button>
+                        <button onclick="addToCart(<?= $s['id'] ?>)" class="btn btn-outline btn-cart-add" aria-label="Add to cart"><i class="fa-solid fa-cart-plus"></i></button>
                         <button type="button" onclick="openServiceBookingModal(<?= $s['id'] ?>, '<?= addslashes(htmlspecialchars($s['name'], ENT_QUOTES)) ?>')" class="<?= $btnClass ?>">Book Appointment</button>
                     </div>
                 </div>
@@ -342,7 +342,8 @@ if (isset($pdo)) {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById('cart-count-badge').textContent = data.cart_count;
+                        const badge = document.getElementById('cart-count-badge');
+                        if (badge) badge.textContent = data.cart_count;
                     }
                 })
                 .catch(() => {});
