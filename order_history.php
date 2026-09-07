@@ -89,16 +89,11 @@ try {
 </head>
 
 <body>
-    <!-- ==================== BUY NOW / CHECKOUT MODAL ==================== -->
     <?php require_once 'components/header.php'; ?>
 
     <div class="history-wrapper">
         <div class="history-container">
-            <h2><i class="fa-solid fa-clock-rotate-left"></i> My Order History</h2>
-
-
-
-            
+            <h2>My Order History</h2>
 
             <?php if (!empty($message)): ?>
                 <div class="history-alert <?= $messageType === 'success' ? 'history-alert-success' : 'history-alert-error' ?>">
@@ -108,9 +103,9 @@ try {
 
             <?php if (empty($orders)): ?>
                 <p style="color: #9ca3af;">You haven't placed any orders yet.</p>
-                <a href="index.php" class="btn-action btn-edit" style="margin-top: 15px; display: inline-block;">Browse Shop</a>
+                <a href="index.php" class="btn-row-action btn-edit" style="margin-top: 15px; display: inline-block; text-decoration: none;">Browse Shop</a>
             <?php else: ?>
-                <div style="overflow-x: auto;">
+                <div class="order-table-wrapper">
                     <table class="styled-table">
                         <thead>
                             <tr>
@@ -142,21 +137,35 @@ try {
                                     </td>
                                     <td><?= htmlspecialchars($ord['created_at']) ?></td>
                                     <td>
-                                        <?php if ($ord['status'] == 'Pending'): ?>
-                                            <button type="button" class="btn-action btn-edit" onclick="openEditModal(
-                                            <?= $ord['id'] ?>, 
-                                            '<?= htmlspecialchars($ord['full_name'], ENT_QUOTES) ?>', 
-                                            '<?= htmlspecialchars($ord['phone'], ENT_QUOTES) ?>', 
-                                            '<?= htmlspecialchars($ord['address'], ENT_QUOTES) ?>'
-                                        )">
-                                                <i class="fa-solid fa-pen-to-square"></i> Edit
+                                        <div class="table-actions">
+                                            <button type="button" class="btn-row-action btn-view" onclick="openViewModal(
+                                                <?= $ord['id'] ?>, 
+                                                '<?= htmlspecialchars($ord['product_name'] ?? 'Custom Product', ENT_QUOTES) ?>',
+                                                '₱<?= number_format($ord['total_amount'], 2) ?>',
+                                                '<?= htmlspecialchars($ord['status'], ENT_QUOTES) ?>',
+                                                '<?= htmlspecialchars($ord['created_at'], ENT_QUOTES) ?>',
+                                                '<?= htmlspecialchars($ord['full_name'], ENT_QUOTES) ?>', 
+                                                '<?= htmlspecialchars($ord['phone'], ENT_QUOTES) ?>', 
+                                                '<?= htmlspecialchars($ord['address'], ENT_QUOTES) ?>'
+                                            )">
+                                                <i class="fa-solid fa-eye"></i> View
                                             </button>
-                                            <a href="order_history.php?delete_id=<?= $ord['id'] ?>" onclick="return confirm('Are you sure you want to cancel and delete this order?');" class="btn-action btn-cancel">
-                                                <i class="fa-solid fa-trash"></i> Cancel
-                                            </a>
-                                        <?php else: ?>
-                                            <span style="color: #6b7280; font-size: 0.85rem; font-style: italic;">Locked</span>
-                                        <?php endif; ?>
+
+                                            <?php if ($ord['status'] == 'Pending'): ?>
+                                                <button type="button" class="btn-row-action btn-edit" onclick="openEditModal(
+                                                    <?= $ord['id'] ?>, 
+                                                    '<?= htmlspecialchars($ord['full_name'], ENT_QUOTES) ?>', 
+                                                    '<?= htmlspecialchars($ord['phone'], ENT_QUOTES) ?>', 
+                                                    '<?= htmlspecialchars($ord['address'], ENT_QUOTES) ?>'
+                                                )">
+                                                    <i class="fa-solid fa-pen-to-square"></i> Edit
+                                                </button>
+
+                                                <button type="button" class="btn-row-action btn-cancel" onclick="if(confirm('Are you sure you want to cancel and delete this order?')) { window.location.href='order_history.php?delete_id=<?= $ord['id'] ?>'; }">
+                                                    <i class="fa-solid fa-trash"></i> Cancel
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -166,6 +175,28 @@ try {
             <?php endif; ?>
 
             <a href="index.php" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to Shop</a>
+        </div>
+    </div>
+
+    <!-- View Order Modal -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Order Details <span id="viewModalOrderId"></span></h3>
+                <button type="button" class="modal-close" onclick="closeViewModal()">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.95rem; color: #f0f6fc;">
+                <div><strong style="color: #8b949e;">Product:</strong> <span id="viewModalProduct"></span></div>
+                <div><strong style="color: #8b949e;">Total Amount:</strong> <span id="viewModalTotal"></span></div>
+                <div><strong style="color: #8b949e;">Status:</strong> <span id="viewModalStatus"></span></div>
+                <div><strong style="color: #8b949e;">Date Placed:</strong> <span id="viewModalDate"></span></div>
+                <div><strong style="color: #8b949e;">Full Name:</strong> <span id="viewModalFullName"></span></div>
+                <div><strong style="color: #8b949e;">Phone Number:</strong> <span id="viewModalPhone"></span></div>
+                <div><strong style="color: #8b949e;">Delivery Address:</strong> <span id="viewModalAddress"></span></div>
+            </div>
+            <div class="modal-actions" style="margin-top: 24px;">
+                <button type="button" class="btn-modal-secondary" onclick="closeViewModal()">Close</button>
+            </div>
         </div>
     </div>
 
@@ -203,10 +234,26 @@ try {
         </div>
     </div>
 
-    <!-- ==================== BUY NOW / CHECKOUT MODAL ==================== -->
-            <?php require_once 'components/footer.php'; ?>
+    <?php require_once 'components/footer.php'; ?>
 
     <script>
+        function openViewModal(id, product, total, status, date, fullName, phone, address) {
+            document.getElementById('viewModalOrderId').innerText = '#' + id;
+            document.getElementById('viewModalProduct').innerText = product;
+            document.getElementById('viewModalTotal').innerText = total;
+            document.getElementById('viewModalStatus').innerText = status;
+            document.getElementById('viewModalDate').innerText = date;
+            document.getElementById('viewModalFullName').innerText = fullName;
+            document.getElementById('viewModalPhone').innerText = phone;
+            document.getElementById('viewModalAddress').innerText = address;
+
+            document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
+
         function openEditModal(id, fullName, phone, address) {
             document.getElementById('modalOrderId').value = id;
             document.getElementById('modalOrderIdDisplay').innerText = '#' + id;
@@ -222,9 +269,13 @@ try {
         }
 
         window.onclick = function(event) {
-            let modal = document.getElementById('editModal');
-            if (event.target == modal) {
+            let editModal = document.getElementById('editModal');
+            let viewModal = document.getElementById('viewModal');
+            if (event.target == editModal) {
                 closeEditModal();
+            }
+            if (event.target == viewModal) {
+                closeViewModal();
             }
         }
     </script>

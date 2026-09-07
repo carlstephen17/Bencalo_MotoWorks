@@ -20,7 +20,8 @@
   display: flex;
 }
 
-.auth-modal-content {
+.auth-modal-content,
+.modal-content {
   background: var(--color-bg-alt, #1e1e1e);
   padding: 30px;
   border-radius: var(--radius-md, 8px);
@@ -31,11 +32,13 @@
   border: 1px solid var(--color-border, #333);
 }
 
-.auth-modal-content.modal-sm {
+.auth-modal-content.modal-sm,
+.modal-content.modal-sm {
   max-width: 480px;
 }
 
-.auth-modal-close {
+.auth-modal-close,
+.modal-close {
   position: absolute;
   top: 15px;
   right: 15px;
@@ -47,11 +50,33 @@
 }
 
 /* ==========================================================================
+   MODAL TOAST NOTIFICATIONS (UNBLURRED)
+   ========================================================================== */
+.modal-toast-container {
+  width: 100%;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-toast-container .toast {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+}
+
+/* ==========================================================================
    MODAL HEADINGS & LAYOUTS
    ========================================================================== */
-.modal-heading {
+.modal-heading,
+.modal-content h2 {
   margin-bottom: 16px;
   text-align: center;
+  color: var(--color-text, #fff);
 }
 
 .modal-heading-lg {
@@ -59,20 +84,34 @@
   text-align: center;
 }
 
-.modal-subtitle {
+.modal-subtitle,
+.modal-content p {
   font-size: 0.85rem;
   text-align: center;
   margin-bottom: 20px;
   color: var(--color-text-muted, #aaa);
 }
 
-.product-summary-box {
+.product-summary-box,
+.checkout-summary {
   background: var(--color-bg-alt, #1e272e);
   padding: 12px;
   border-radius: 6px;
   margin-bottom: 16px;
   font-size: 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.checkout-summary h3 {
+  font-size: 1rem;
+  margin-bottom: 8px;
+  color: var(--color-text, #fff);
+}
+
+.summary-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .buy-product-name {
@@ -95,6 +134,7 @@
   margin-bottom: 12px;
 }
 
+.form-group,
 .form-group-mb {
   margin-bottom: 16px;
 }
@@ -106,7 +146,18 @@
   color: #aaa;
 }
 
-.auth-input {
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: var(--color-text, #fff);
+}
+
+.auth-input,
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"] {
   width: 100%;
   padding: 10px;
   background: var(--color-bg-alt, #1e272e);
@@ -132,7 +183,8 @@
   margin-bottom: 12px;
 }
 
-.auth-textarea {
+.auth-textarea,
+textarea {
   width: 100%;
   padding: 10px;
   margin-bottom: 12px;
@@ -145,26 +197,23 @@
 }
 
 /* Password Toggle Field */
-.password-container {
+.password-container,
+.password-input-wrapper {
   position: relative;
   width: 100%;
-  margin-bottom: 12px;
 }
 
-.password-container.mb-sm { margin-bottom: 12px; }
-.password-container.mb-md { margin-bottom: 16px; }
+.password-container.mb-sm, .password-input-wrapper.mb-sm { margin-bottom: 12px; }
+.password-container.mb-md, .password-input-wrapper.mb-md { margin-bottom: 16px; }
 
-.password-container input {
+.password-container input,
+.password-input-wrapper input {
   width: 100%;
   padding: 12px 40px 12px 12px;
-  background: var(--color-bg-alt);
-  border: 1px solid var(--color-primary);
-  color: var(--color-text);
-  border-radius: var(--radius-sm);
-}
-
-.password-container .auth-input-padded-r {
-  padding-right: 40px;
+  background: var(--color-bg-alt, #1e272e);
+  border: 1px solid var(--color-primary, #00d2d3);
+  color: var(--color-text, #fff);
+  border-radius: var(--radius-sm, 4px);
 }
 
 .toggle-password {
@@ -180,16 +229,36 @@
 }
 
 .toggle-password:hover {
-  color: var(--color-primary);
+  color: var(--color-primary, #00d2d3);
 }
 
 /* Auth Options & Footer Links */
-.auth-options {
+.auth-options,
+.form-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
   font-size: 0.85rem;
+  color: var(--color-text-muted, #aaa);
+}
+
+.form-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.form-options a,
+.auth-link-primary {
+  color: var(--color-primary, #00d2d3);
+  text-decoration: none;
+}
+
+.form-options a:hover {
+  text-decoration: underline;
 }
 
 .checkbox-label {
@@ -199,15 +268,50 @@
   cursor: pointer;
 }
 
-.auth-link-primary {
-  color: var(--color-primary, #00d2d3);
-}
-
-.auth-modal-footer {
+.auth-modal-footer,
+.modal-footer-text {
   text-align: center;
   margin-top: 15px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #aaa);
 }
 
-.btn-full-width {
+.auth-modal-footer a,
+.modal-footer-text a {
+  color: var(--color-primary, #00d2d3);
+  text-decoration: none;
+}
+
+.auth-modal-footer a:hover,
+.modal-footer-text a:hover {
+  text-decoration: underline;
+}
+
+.btn-full-width,
+.btn-full {
   width: 100%;
+}
+
+/* ==========================================================================
+   MODAL INLINE FEEDBACK MESSAGES
+   ========================================================================== */
+.modal-feedback-message {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.85rem;
+  text-align: center;
+  word-break: break-word;
+}
+
+.modal-feedback-message.error {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.modal-feedback-message.success {
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
 }

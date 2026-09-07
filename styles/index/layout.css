@@ -43,14 +43,14 @@
 
 .main-nav {
   position: absolute;
-  left: 50%;
+  left: 40%;
   transform: translateX(-35%);
   margin: 0;
 }
 
 .main-nav ul {
   display: flex;
-  gap: 60px;
+  gap: 100px;
 }
 
 .main-nav a {

@@ -1,11 +1,13 @@
 <?php
-// ==================== UPDATED REGISTRATION PROCESSOR (register.php) ====================
-require_once 'config.php';
 session_start();
+require_once 'config.php';
+require_once 'includes/validation.php';
 
+header('Content-Type: application/json');
 $response = ['success' => false, 'message' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $token      = $_POST['csrf_token'] ?? '';
     $username   = trim($_POST['username'] ?? '');
     $first_name = trim($_POST['first_name'] ?? '');
     $last_name  = trim($_POST['last_name'] ?? '');
@@ -13,35 +15,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone      = trim($_POST['phone'] ?? '');
     $password   = $_POST['password'] ?? '';
 
-    if (!empty($username) && !empty($first_name) && !empty($last_name) && !empty($email) && !empty($password)) {
-        
-        // Check if username or email already exists individually for specific error tracking
+    // 1. Pre-check database for existing username or email so we can order them top-to-bottom
+    $usernameExists = false;
+    $emailExists = false;
+
+    if (!empty($username) && !empty($email)) {
         $checkStmt = $pdo->prepare("SELECT username, email FROM users WHERE username = ? OR email = ?");
         $checkStmt->execute([$username, $email]);
-        $existingUser = $checkStmt->fetch();
-
-        if ($existingUser) {
-            if (strcasecmp($existingUser['username'], $username) === 0) {
-                $response['message'] = "Username '$username' is already taken. Please choose another.";
-            } else {
-                $response['message'] = "Email address '$email' is already registered.";
+        while ($row = $checkStmt->fetch()) {
+            if (strcasecmp($row['username'], $username) === 0) {
+                $usernameExists = true;
             }
-        } else {
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            $insertStmt = $pdo->prepare("INSERT INTO users (username, first_name, last_name, email, phone, password) VALUES (?, ?, ?, ?, ?, ?)");
-            
-            if ($insertStmt->execute([$username, $first_name, $last_name, $email, $phone, $hashedPassword])) {
-                $response['success'] = true;
-                $response['message'] = "Successfully signed up! You can now log in.";
-            } else {
-                $response['message'] = "Something went wrong. Please try again.";
+            if (strcasecmp($row['email'], $email) === 0) {
+                $emailExists = true;
             }
         }
-    } else {
-        $response['message'] = "Please fill in all required fields.";
     }
 
-    header('Content-Type: application/json');
+    // 2. Run input validation rules strictly from top to bottom
+    $errors = array_values(array_filter([
+        validateFormSecurityToken($token, $_SESSION['csrf_token'] ?? null),
+        validateRequired($username, 'Username'),
+        $usernameExists ? "Username '$username' is already taken." : null,
+        validateRequired($first_name, 'First Name'),
+        validateRequired($last_name, 'Last Name'),
+        validateRequired($email, 'Email Address'),
+        validateEmailFormat($email),
+        $emailExists ? "Email address '$email' is already registered." : null,
+        validateRequired($phone, 'Phone Number'),
+        validatePhoneNumber($phone),
+        validateRequired($password, 'Password'),
+        validatePasswordStrength($password)
+    ]));
+
+    if (!empty($errors)) {
+        echo json_encode(['success' => false, 'message' => $errors[0]]);
+        exit;
+    }
+
+    // 3. Insert new user if all validations pass
+    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+    $insertStmt = $pdo->prepare("INSERT INTO users (username, first_name, last_name, email, phone, password) VALUES (?, ?, ?, ?, ?, ?)");
+
+    if ($insertStmt->execute([$username, $first_name, $last_name, $email, $phone, $hashedPassword])) {
+        $response['success'] = true;
+        $response['message'] = "Successfully signed up! You can now log in.";
+    } else {
+        $response['message'] = "Something went wrong. Please try again.";
+    }
+
     echo json_encode($response);
     exit;
 }

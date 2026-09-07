@@ -1,163 +1,323 @@
-/* ==================== FULL-SIZE ORDER HISTORY & EDIT MODAL ==================== */
+/* ==========================================================================
+   Global & Sticky Footer Setup
+   ========================================================================== */
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--color-bg, #0b0f19);
+  color: var(--color-text, #ffffff);
+}
+
 .history-wrapper {
-    width: 100%;
-    min-height: 80vh;
-    padding: 40px 5%;
-    box-sizing: border-box;
+  width: 100%;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 .history-container {
-    width: 100%;
-    background: #111827;
-    border-radius: 12px;
-    padding: 30px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    border: 1px solid #1f2937;
-    box-sizing: border-box;
-    color: #e5e7eb;
+  flex: 1 0 auto;
+  padding-top: 60px;
+  padding-bottom: 20px;
+  width: 100%;
+  max-width: 2500px;
+  padding-left: 13rem;
+  padding-right: 13rem;
+  box-sizing: border-box;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .history-container h2 {
-    color: #38bdf8;
-    margin-bottom: 20px;
-    font-size: 1.8rem;
+  color: var(--color-text);
+  margin-bottom: 20px;
+  font-size: 2.5rem;
 }
 
 .history-alert {
-    padding: 12px 16px;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    font-weight: 500;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  font-weight: 500;
 }
-.history-alert-success { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
-.history-alert-error { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
+.history-alert-success {
+  background: rgba(46, 213, 115, 0.15);
+  color: #2ed573;
+  border: 1px solid #2ed573;
+}
+.history-alert-error {
+  background: rgba(255, 71, 87, 0.15);
+  color: #ff4757;
+  border: 1px solid #ff4757;
+}
+
+/* ==========================================================================
+   Order Table Wrapper & Layout
+   ========================================================================== */
+.order-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  margin-top: 15px;
+}
 
 .styled-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-    overflow: hidden;
-    border-radius: 8px;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+  color: #f0f6fc;
 }
-.styled-table thead tr {
-    background: #1f2937;
-    color: #38bdf8;
-    text-align: left;
-    font-weight: 600;
+
+/* Explicit column widths matching appointments proportions */
+.styled-table th:nth-child(1), .styled-table td:nth-child(1) { width: 10%; } /* Order ID */
+.styled-table th:nth-child(2), .styled-table td:nth-child(2) { width: 28%; } /* Product */
+.styled-table th:nth-child(3), .styled-table td:nth-child(3) { width: 13%; } /* Total Amount */
+.styled-table th:nth-child(4), .styled-table td:nth-child(4) { width: 12%; } /* Status */
+.styled-table th:nth-child(5), .styled-table td:nth-child(5) { width: 17%; } /* Date Placed */
+.styled-table th:nth-child(6), .styled-table td:nth-child(6) { width: 20%; } /* Actions */
+
+.styled-table th {
+  color: var(--color-border, #00d2d3);
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
-.styled-table th, .styled-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #374151;
+
+.styled-table th,
+.styled-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #30363d;
+  font-size: 0.95rem;
+  vertical-align: middle;
 }
+
 .styled-table tbody tr:hover {
-    background: rgba(55, 65, 81, 0.4);
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
+.styled-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ==========================================================================
+   Badges & Status Elements
+   ========================================================================== */
 .badge {
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+  width: fit-content;
 }
-.badge-pending { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }
-.badge-completed { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
 
-.btn-action {
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    transition: all 0.2s ease;
+.badge-pending {
+  background: rgba(243, 156, 18, 0.15);
+  color: #f39c12;
+  border: 1px solid #f39c12;
 }
-.btn-edit { background: #0284c7; color: #fff; }
-.btn-edit:hover { background: #0369a1; }
-.btn-cancel { background: #dc2626; color: #fff; }
-.btn-cancel:hover { background: #b91c1c; }
+
+.badge-completed {
+  background: rgba(46, 213, 115, 0.15);
+  color: #2ed573;
+  border: 1px solid #2ed573;
+}
+
+.badge-cancelled {
+  background: rgba(255, 71, 87, 0.15);
+  color: #ff4757;
+  border: 1px solid #ff4757;
+}
+
+/* ==========================================================================
+   Table Actions & Buttons (Strictly matching appointment button basis)
+   ========================================================================== */
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-row-action {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+.btn-row-action:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+/* View Button: Sleek Neutral Dark */
+.btn-view {
+  background: #21262d;
+  color: #f0f6fc;
+  border: 1px solid #30363d;
+}
+
+/* Edit Button: Preferred Blue */
+.btn-edit {
+  background: #0969da;
+  color: #ffffff;
+  border: none;
+}
+
+/* Cancel / Delete Button */
+.btn-cancel,
+.btn-delete {
+  background: #ee5253;
+  color: #ffffff;
+  border: none;
+}
 
 .back-link {
-    display: inline-block;
-    margin-top: 25px;
-    color: #38bdf8;
-    text-decoration: none;
-    font-weight: 500;
+  display: inline-block;
+  margin-top: 25px;
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 500;
 }
-.back-link:hover { text-decoration: underline; }
+.back-link:hover {
+  text-decoration: underline;
+}
 
-/* Modal Overlay Styling */
+/* ==========================================================================
+   CRUD Modals & Form Styling
+   ========================================================================== */
 .modal-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
 }
-.modal-card {
-    background: #1f2937;
-    width: 100%;
-    max-width: 500px;
-    padding: 30px;
-    border-radius: 12px;
-    border: 1px solid #374151;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-    position: relative;
-    color: #e5e7eb;
-}
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-.modal-header h3 { color: #38bdf8; margin: 0; font-size: 1.4rem; }
-.modal-close {
-    background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer;
-}
-.modal-close:hover { color: #fff; }
 
-.modal-form-group {
-    margin-bottom: 15px;
+.modal-overlay.active {
+  display: flex;
 }
-.modal-form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 0.9rem;
-    color: #d1d5db;
+
+.modal-card,
+.crud-modal-content {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+  padding: 24px;
+  color: #f0f6fc;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
-.modal-form-control {
-    width: 100%;
-    padding: 10px 12px;
-    background: #111827;
-    border: 1px solid #4b5563;
-    border-radius: 6px;
-    color: #fff;
-    font-size: 0.95rem;
-    box-sizing: border-box;
+
+.modal-header,
+.crud-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
 }
-.modal-form-control:focus {
-    outline: none;
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+
+.modal-header h3,
+.crud-modal-header h3 {
+  margin: 0;
+  color: #00d2d3;
 }
+
+.modal-close,
+.close-modal-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.modal-close:hover,
+.close-modal-btn:hover {
+  color: #fff;
+}
+
+.modal-form-group,
+.form-group {
+  margin-bottom: 14px;
+}
+
+.modal-form-group label,
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+  color: #8b949e;
+}
+
+.modal-form-control,
+.form-control {
+  width: 100%;
+  padding: 9px 12px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #f0f6fc;
+  box-sizing: border-box;
+}
+
+.modal-form-control:focus,
+.form-control:focus {
+  border-color: #00d2d3;
+  outline: none;
+}
+
 .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
 }
+
 .btn-modal-secondary {
-    background: #4b5563; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+  background: #21262d;
+  color: #f0f6fc;
+  border: 1px solid #30363d;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
 }
-.btn-modal-secondary:hover { background: #374151; }
+.btn-modal-secondary:hover {
+  background: #30363d;
+}
+
 .btn-modal-primary {
-    background: #0284c7; color: #fff; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600;
+  background: #0969da;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
 }
-.btn-modal-primary:hover { background: #0369a1; }
+.btn-modal-primary:hover {
+  background: #0757a1;
+}

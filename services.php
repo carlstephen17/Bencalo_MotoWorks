@@ -55,7 +55,7 @@ if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
 
 // Define default_services globally so it's always in scope
 $default_services = [
-    ["id" => 1, "name" => "Complete Periodic Maintenance Service (PMS)", "price" => 450.00, "image" => "images/featured_products/synthetic_oil.png", "featured" => 1],
+    ["id" => 1, "name" => "Complete Periodic Maintenance Service (PMS)", "price" => 450.00, "image" => "images/featured_products/synthetic_oil.png", "featured" => 0],
     ["id" => 2, "name" => "Engine Tuning & Diagnostic Scan", "price" => 350.00, "image" => "images/featured_products/spark_plug.png", "featured" => 0],
     ["id" => 3, "name" => "Suspension Overhaul & Tuning", "price" => 600.00, "image" => "images/featured_products/h3420_side_mirror.png", "featured" => 0],
     ["id" => 4, "name" => "Brake System Flush & Pad Replacement", "price" => 250.00, "image" => "images/featured_products/brake_pads.png", "featured" => 0],
