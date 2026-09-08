@@ -39,6 +39,7 @@ $cart_count = $cart_count ?? 0;
                         <a href="profile.php"><i class="fa-solid fa-user"></i> My Profile</a>
                         <a href="appointment_history.php"><i class="fa-solid fa-calendar-check"></i> Appointments</a>
                         <a href="order_history.php"><i class="fa-solid fa-box"></i> Order History</a>
+                        <a href="promo_history.php"><i class="fa-solid fa-box"></i> Promo History</a>
                         <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Log Out</a>
                     </div>
                 </div>

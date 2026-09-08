@@ -3,19 +3,38 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
+// Normalize Database Connection Object ($conn or $pdo)
+if (!isset($pdo) && isset($conn)) {
+    $pdo = $conn;
 }
 
 require_once 'config.php';
 
-$userId = $_SESSION['user_id'];
+// 4. Resolve Logged-in User ID across standard session keys
+$userId = $_SESSION['user_id']
+    ?? $_SESSION['id']
+    ?? $_SESSION['user']['id']
+    ?? $_SESSION['user_id_pk']
+    ?? null;
+
+if (!$userId) {
+    header('Location: login.php');
+    exit;
+}
+
+// 2. Load Functions & Auth Helpers if available
+if (file_exists('includes/functions.php')) {
+    require_once 'includes/functions.php';
+}
+if (file_exists('includes/auth.php')) {
+    require_once 'includes/auth.php';
+}
+
 $message = '';
 $messageType = '';
 
 // Handle Delete / Cancel Request
-if (isset($_GET['delete_id'])) {
+if (isset($_GET['delete_id']) && isset($pdo)) {
     $deleteId = filter_input(INPUT_GET, 'delete_id', FILTER_VALIDATE_INT);
     if ($deleteId) {
         try {
@@ -36,7 +55,7 @@ if (isset($_GET['delete_id'])) {
 }
 
 // Handle Update Request from Modal POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_order') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_order' && isset($pdo)) {
     $orderId = filter_input(INPUT_POST, 'order_id', FILTER_VALIDATE_INT);
     $fullName = trim($_POST['full_name'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
@@ -59,19 +78,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Fetch user's orders joined with products table
-try {
-    $stmt = $pdo->prepare("
-        SELECT o.*, p.name AS product_name, p.image AS product_image 
-        FROM orders o 
-        LEFT JOIN products p ON o.product_id = p.id 
-        WHERE o.user_id = ? 
-        ORDER BY o.created_at DESC
-    ");
-    $stmt->execute([$userId]);
-    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    $orders = [];
+// Fetch user's orders using the helper function if available, or fallback query (sorted ASC to start with ID 1)
+$orders = [];
+if (isset($pdo)) {
+    if (function_exists('getUserOrders')) {
+        $orders = getUserOrders($pdo, $userId);
+        // Ensure ascending order if the helper returns DESC
+        usort($orders, function($a, $b) {
+            return $a['id'] <=> $b['id'];
+        });
+    } else {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT o.*, p.name AS product_name, p.image AS product_image 
+                FROM orders o 
+                LEFT JOIN products p ON o.product_id = p.id 
+                WHERE o.user_id = ? 
+                ORDER BY o.id ASC
+            ");
+            $stmt->execute([$userId]);
+            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            $orders = [];
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -89,7 +119,11 @@ try {
 </head>
 
 <body>
-    <?php require_once 'components/header.php'; ?>
+    <?php 
+    if (file_exists('components/header.php')) {
+        require_once 'components/header.php';
+    } 
+    ?>
 
     <div class="history-wrapper">
         <div class="history-container">
@@ -234,7 +268,11 @@ try {
         </div>
     </div>
 
-    <?php require_once 'components/footer.php'; ?>
+    <?php 
+    if (file_exists('components/footer.php')) {
+        require_once 'components/footer.php';
+    } 
+    ?>
 
     <script>
         function openViewModal(id, product, total, status, date, fullName, phone, address) {

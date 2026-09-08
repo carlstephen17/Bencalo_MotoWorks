@@ -9,6 +9,35 @@ if (empty($_SESSION['csrf_token'])) {
 $user_phone = $user_phone ?? '';
 ?>
 
+<!-- ==================== VIEW MODAL ==================== -->
+<div id="viewModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>View Promo Claim Details</h3>
+            <button type="button" class="modal-close" onclick="closeModal('viewModal')">&times;</button>
+        </div>
+        <div class="modal-body" id="viewModalBody">
+            <p>Loading details...</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-row-action btn-view" onclick="closeModal('viewModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== EDIT MODAL ==================== -->
+<div id="editModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Promo Claim / Appointment</h3>
+            <button type="button" class="modal-close" onclick="closeModal('editModal')">&times;</button>
+        </div>
+        <div class="modal-body" id="editModalBody">
+            <p>Loading form...</p>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== BUY NOW / CHECKOUT MODAL ==================== -->
 <div id="buy-modal" class="auth-modal">
     <div class="auth-modal-content modal-sm">
@@ -161,6 +190,45 @@ $user_phone = $user_phone ?? '';
         // Register form handler for service booking modal AJAX submission
         handleFormSubmit('ajax-service-booking-form', 'process_booking.php', 'service-booking-modal');
     });
+
+    // Global Modal and Fetch Handlers for View / Edit Promo History Records
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
+    }
+
+    function openViewModal(id) {
+        openModal('viewModal');
+        document.getElementById('viewModalBody').innerHTML = '<p>Loading details...</p>';
+
+        fetch('get_claim.php?id=' + id + '&mode=view')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('viewModalBody').innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('viewModalBody').innerHTML = '<p style="color: red;">Error loading details.</p>';
+            });
+    }
+
+    function openEditModal(id) {
+        openModal('editModal');
+        document.getElementById('editModalBody').innerHTML = '<p>Loading form...</p>';
+
+        fetch('get_claim.php?id=' + id + '&mode=edit')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('editModalBody').innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('editModalBody').innerHTML = '<p style="color: red;">Error loading form.</p>';
+            });
+    }
 </script>
 
 <!-- ==================== LOGIN MODAL ==================== -->
@@ -243,3 +311,156 @@ $user_phone = $user_phone ?? '';
         <p class="auth-modal-footer"><a href="#" onclick="switchModal('forgot-modal', 'login-modal')" class="auth-link">Back to Log In</a></p>
     </div>
 </div>
+
+
+
+<!-- Claim Modal Overlay Component -->
+<div id="claimModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-clipboard-check" style="color: #00d2d3;"></i> Claim Bundle: <span id="modalBundleTitle"></span></h3>
+            <button type="button" class="modal-close-btn" onclick="closeClaimModal()">&times;</button>
+        </div>
+        <form action="process_promo.php" method="POST">
+            <input type="hidden" name="bundle_slug" id="modalBundleSlug">
+
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" name="fullname" value="<?= htmlspecialchars($modalUserName ?? '') ?>" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="text" name="phone" value="<?= htmlspecialchars($modalUserPhone ?? '') ?>" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label id="modalItemLabel">Select Option</label>
+                <select name="selected_item_option" id="modalItemOptions" class="form-control" required>
+                    <!-- Populated dynamically via JS -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Preferred Appointment Date</label>
+                <input type="date" name="appointment_date" id="appointmentDateInput" class="form-control" required min="<?= date('Y-m-d') ?>" onclick="this.showPicker && this.showPicker()">
+            </div>
+
+            <div class="form-group">
+                <label>Preferred Appointment Time Slot</label>
+                <select name="appointment_time" class="form-control" required>
+                    <option value="" disabled selected>Select Time Slot</option>
+                    <option value="08:00 AM - 10:00 AM">08:00 AM - 10:00 AM</option>
+                    <option value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM</option>
+                    <option value="01:00 PM - 03:00 PM">01:00 PM - 03:00 PM</option>
+                    <option value="03:00 PM - 05:00 PM">03:00 PM - 05:00 PM</option>
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-modal" onclick="closeClaimModal()">Cancel</button>
+                <button type="submit" class="btn-primary-modal" style="background-color: var(--color-primary); color: var(--color-text); transition: background-color 0.2s ease, border-color 0.2s ease;" onmouseover="this.style.backgroundColor='var(--color-border, #00d2d3)'" onmouseout="this.style.backgroundColor='var(--color-primary)'">Confirm & Claim Bundle</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    /* Open Service Booking Modal Flow */
+    function openServiceBookingModal(serviceId, serviceName) {
+        if (typeof isLoggedIn !== 'undefined' && !isLoggedIn) {
+            openModal('login-modal');
+            showModalAlert('login-modal', 'Please log in to book a service appointment.', 'error');
+            return;
+        }
+        const serviceIdInput = document.getElementById('booking-service-id');
+        const serviceNameSpan = document.getElementById('booking-service-name');
+        if (serviceIdInput) serviceIdInput.value = serviceId;
+        if (serviceNameSpan) serviceNameSpan.textContent = serviceName;
+        openModal('service-booking-modal');
+    }
+
+    // Safe fallback for form submission handlers
+    if (typeof handleFormSubmit !== 'function') {
+        window.handleFormSubmit = function(formId, targetUrl, modalId) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+
+                fetch(targetUrl, {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert(data.message || 'An error occurred while saving.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            });
+        };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof handleFormSubmit === 'function') {
+            handleFormSubmit('ajax-service-booking-form', 'process_booking.php', 'service-booking-modal');
+        }
+    });
+
+    // Unified Global Modal Open/Close Handlers
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.classList.add('active');
+        } else {
+            console.warn('Modal with ID not found:', modalId);
+        }
+    }
+
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+    }
+
+    function openViewModal(id) {
+        openModal('viewModal');
+        const bodyEl = document.getElementById('viewModalBody');
+        if (bodyEl) bodyEl.innerHTML = '<p>Loading details...</p>';
+
+        fetch('get_claim.php?id=' + id + '&mode=view')
+            .then(response => response.text())
+            .then(html => {
+                if (bodyEl) bodyEl.innerHTML = html;
+            })
+            .catch(error => {
+                if (bodyEl) bodyEl.innerHTML = '<p style="color: red;">Error loading details.</p>';
+            });
+    }
+
+    function openEditModal(id) {
+        openModal('editModal');
+        const bodyEl = document.getElementById('editModalBody');
+        if (bodyEl) bodyEl.innerHTML = '<p>Loading form...</p>';
+
+        fetch('get_claim.php?id=' + id + '&mode=edit')
+            .then(response => response.text())
+            .then(html => {
+                if (bodyEl) bodyEl.innerHTML = html;
+            })
+            .catch(error => {
+                if (bodyEl) bodyEl.innerHTML = '<p style="color: red;">Error loading form.</p>';
+            });
+    }
+</script>

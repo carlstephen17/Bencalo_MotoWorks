@@ -8,7 +8,10 @@ if (file_exists('config.php')) {
     require_once 'includes/config.php';
 }
 
-// 2. Load Auth Helper if exists
+// 2. Load Functions & Auth Helpers
+if (file_exists('includes/functions.php')) {
+    require_once 'includes/functions.php';
+}
 if (file_exists('includes/auth.php')) {
     require_once 'includes/auth.php';
 }
@@ -72,41 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crud_action']) && iss
     exit();
 }
 
-$appointments = [];
-$services_list = [];
-$services_map = [];
-
-if (isset($pdo)) {
-    // Fetch Services
-    try {
-        $s_stmt = $pdo->query("SELECT * FROM services");
-        $services_list = $s_stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($services_list as $s) {
-            $s_id = $s['service_id'] ?? $s['id'] ?? null;
-            if ($s_id) {
-                $services_map[$s_id] = [
-                    'name'  => $s['service_name'] ?? $s['title'] ?? $s['name'] ?? ('Service #' . $s_id),
-                    'price' => $s['price'] ?? $s['cost'] ?? $s['rate'] ?? 0
-                ];
-            }
-        }
-    } catch (Exception $e) {
-        $services_list = [];
-    }
-
-    // Fetch User Bookings
-    try {
-        $stmt = $pdo->prepare("
-            SELECT * FROM service_bookings 
-            WHERE user_id = ? 
-            ORDER BY booking_date DESC, id DESC
-        ");
-        $stmt->execute([$user_id]);
-        $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        $appointments = [];
-    }
-}
+// Fetch data cleanly using functions from includes/functions.php
+$services_list = isset($pdo) ? getAllServices($pdo) : [];
+$services_map  = isset($pdo) ? getServicesMap($pdo) : [];
+$appointments  = isset($pdo) ? getUserAppointments($pdo, $user_id) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
