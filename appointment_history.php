@@ -124,6 +124,7 @@ $appointments  = isset($pdo) ? getUserAppointments($pdo, $user_id) : [];
                 <table class="appointment-table">
                     <thead>
                         <tr>
+                            <th style="width: 50px; text-align: center;">#</th>
                             <th>Service</th>
                             <th>Vehicle</th>
                             <th>Date & Time</th>
@@ -134,7 +135,9 @@ $appointments  = isset($pdo) ? getUserAppointments($pdo, $user_id) : [];
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($appointments as $app):
+                        <?php 
+                        $counter = 1;
+                        foreach ($appointments as $app):
                             $s_id = $app['service_id'] ?? null;
                             $service_info = $services_map[$s_id] ?? ['name' => 'Service #' . ($s_id ?? 'N/A'), 'price' => 0];
                             $status = $app['status'] ?? 'Pending';
@@ -145,6 +148,7 @@ $appointments  = isset($pdo) ? getUserAppointments($pdo, $user_id) : [];
                             ]);
                         ?>
                             <tr>
+                                <td style="text-align: center; color: var(--text-muted, #8b949e);"><?= $counter++ ?></td>
                                 <td><strong><?= htmlspecialchars($service_info['name']) ?></strong></td>
                                 <td><?= htmlspecialchars($app['vehicle_model'] ?? 'N/A') ?></td>
                                 <td>
