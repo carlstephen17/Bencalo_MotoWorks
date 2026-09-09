@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once 'includes/config.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -55,14 +55,42 @@ if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
 
 // Define default_services globally so it's always in scope
 $default_services = [
-    ["id" => 1, "name" => "Complete Periodic Maintenance Service (PMS)", "price" => 450.00, "image" => "images/featured_products/synthetic_oil.png", "featured" => 0],
-    ["id" => 2, "name" => "Engine Tuning & Diagnostic Scan", "price" => 350.00, "image" => "images/featured_products/spark_plug.png", "featured" => 0],
-    ["id" => 3, "name" => "Suspension Overhaul & Tuning", "price" => 600.00, "image" => "images/featured_products/h3420_side_mirror.png", "featured" => 0],
-    ["id" => 4, "name" => "Brake System Flush & Pad Replacement", "price" => 250.00, "image" => "images/featured_products/brake_pads.png", "featured" => 0],
-    ["id" => 5, "name" => "Tire Mount, Balance & Alignment", "price" => 300.00, "image" => "images/featured_products/tire.webp", "featured" => 0],
-    ["id" => 6, "name" => "Chain & Sprocket Replacement Service", "price" => 200.00, "image" => "images/featured_products/brake_pads.png", "featured" => 0],
-    ["id" => 7, "name" => "Electrical System & Wiring Repair", "price" => 280.00, "image" => "images/featured_products/spark_plug.png", "featured" => 0],
-    ["id" => 8, "name" => "Coolant Flush & Radiator Servicing", "price" => 320.00, "image" => "images/featured_products/coolant.png", "featured" => 0]
+    ["id" => 1, "name" => "Premium Oil & Change Service", "description" => "Full synthetic oil, new filter, comprehensive check-up.", "price" => 450.00, "image" => "images/featured_products/synthetic_oil.png", "featured" => 0],
+    ["id" => 2, "name" => "Wheel & Tire Service", "description" => "Mounting, precision balancing, and pressure check,", "price" => 350.00, "image" => "images/featured_products/tire.webp", "featured" => 0],
+    ["id" => 3, "name" => "Vehicle Washing Service", "description" => "Complete exterior wash, foam bath, wheel cleaning, and wax finishing", "price" => 600.00, "image" => "images/featured_products/h3420_side_mirror.png", "featured" => 0],
+    ["id" => 4, "name" => "Battery Service", "description" => "Battery inspection, voltage testing, terminal cleaning, and battery replacement", "price" => 250.00, "image" => "images/featured_services/battery_service.png", "featured" => 0],
+    [
+        "id" => 5, 
+        "name" => "General Maintenance & Tune-Up", 
+        "description" => "Comprehensive inspection, oil change, filter replacement, and engine tuning.", 
+        "price" => 450.00, 
+        "image" => "images/services/general.png", 
+        "featured" => 0
+    ],
+    [
+        "id" => 6, 
+        "name" => "Chain & Sprocket Replacement", 
+        "description" => "Removal of worn components, installation of new high-durability chain and sprockets, and tension adjustment.", 
+        "price" => 200.00, 
+        "image" => "images/services/chain.png", 
+        "featured" => 0
+    ],
+    [
+        "id" => 7, 
+        "name" => "Brake System Servicing", 
+        "description" => "Professional brake pad replacement, rotor inspection, and hydraulic fluid flushing.", 
+        "price" => 350.00, 
+        "image" => "images/services/brake.png", 
+        "featured" => 0
+    ],
+    [
+        "id" => 8, 
+        "name" => "Electrical System & Wiring Repair", 
+        "description" => "Diagnostic testing, wiring harness repair, lighting checks, and electrical troubleshooting.", 
+        "price" => 280.00, 
+        "image" => "images/services/electrical.png", 
+        "featured" => 0
+    ],
 ];
 
 // Fetch ALL Services from Database with Auto-Seeding & Sync
@@ -70,17 +98,18 @@ $services = [];
 if (isset($pdo)) {
     try {
         $stmtUpsert = $pdo->prepare("
-            INSERT INTO services (id, name, price, image, active, featured) 
-            VALUES (?, ?, ?, ?, 1, ?)
+            INSERT INTO services (id, name, description, price, image, active, featured) 
+            VALUES (?, ?, ?, ?, ?, 1, ?)
             ON DUPLICATE KEY UPDATE 
                 name = VALUES(name), 
+                description = VALUES(description),
                 price = VALUES(price), 
                 image = VALUES(image),
                 featured = VALUES(featured)
         ");
 
         foreach ($default_services as $ds) {
-            $stmtUpsert->execute([$ds['id'], $ds['name'], $ds['price'], $ds['image'], $ds['featured']]);
+            $stmtUpsert->execute([$ds['id'], $ds['name'], $ds['description'], $ds['price'], $ds['image'], $ds['featured']]);
         }
 
         $stmt = $pdo->query("SELECT * FROM services WHERE active = 1 ORDER BY id DESC");
@@ -166,6 +195,7 @@ if (isset($pdo)) {
                         <img src="<?= htmlspecialchars($s['image']) ?>" alt="<?= htmlspecialchars($s['name']) ?>">
                     </div>
                     <h3 class="product-name"><?= htmlspecialchars($s['name']) ?></h3>
+                    <p class="product-description" style="font-size: 13px; opacity: 0.8; margin-bottom: 10px;"><?= htmlspecialchars($s['description'] ?? '') ?></p>
                     <div class="product-price"><?= $priceFormatted ?></div>
                     <div class="product-card-actions">
                         <button onclick="addToCart(<?= $s['id'] ?>)" class="btn btn-outline btn-cart-add" aria-label="Add to cart"><i class="fa-solid fa-cart-plus"></i></button>

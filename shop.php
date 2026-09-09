@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once 'includes/config.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -22,7 +22,6 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token']) && isset($
     }
 }
 
-// Fetch Logged-in User's Phone Number for Checkout Autofill
 $user_phone = '';
 if (isset($_SESSION['user_id']) && isset($pdo)) {
     try {
@@ -33,7 +32,6 @@ if (isset($_SESSION['user_id']) && isset($pdo)) {
             $user_phone = $userData['phone'];
         }
     } catch (Exception $e) {
-        // Fallback silently if query fails
     }
 }
 
@@ -44,19 +42,17 @@ if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
     }
 }
 
-// Define default_products globally so it's always in scope
 $default_products = [
     ["id" => 1, "name" => "GIVI HPS 50.6 Stuttgart Solid Black Medium (H506FSBK)", "price" => 250.00, "image" => "images/featured_products/helmet.png", "featured" => 0],
     ["id" => 2, "name" => "MOTUL 300V 4T Factory Line 10W40 1L", "price" => 320.00, "image" => "images/featured_products/synthetic_oil.png", "featured" => 0],
     ["id" => 3, "name" => "KOSO Side Mirror", "price" => 320.00, "image" => "images/featured_products/h3420_side_mirror.png", "featured" => 0],
     ["id" => 4, "name" => "Michelin Pilot Sport 4 225/40 ZR18 92Y XL", "price" => 325.00, "image" => "images/featured_products/tire.webp", "featured" => 0],
-    ["id" => 5, "name" => "NGK Iridium IX Spark Plug", "price" => 45.00, "image" => "images/featured_products/spark_plug.png", "featured" => 0],
-    ["id" => 6, "name" => "Brembo High Performance Brake Pads", "price" => 180.00, "image" => "images/featured_products/brake_pads.png", "featured" => 0],
-    ["id" => 7, "name" => "DID Heavy Duty Racing Chain & Sprocket Set", "price" => 1250.00, "image" => "images/featured_products/brake_pads.png", "featured" => 0],
-    ["id" => 8, "name" => "Racing Boy (RCB) S1 Series Brake Master Cylinder", "price" => 950.00, "image" => "images/featured_products/brake_pads.png", "featured" => 0]
+    ["id" => 5, "name" => "NGK Iridium IX Spark Plug", "price" => 45.00, "image" => "images/products/iridium.png", "featured" => 0],
+    ["id" => 6, "name" => "Brembo High Performance Brake Pads", "price" => 180.00, "image" => "images/products/brembo.png", "featured" => 0],
+    ["id" => 7, "name" => "DID Heavy Duty Racing Chain & Sprocket Set", "price" => 1250.00, "image" => "images/products/chain.png", "featured" => 0],
+    ["id" => 8, "name" => "Racing Boy (RCB) S1 Series Brake Master Cylinder", "price" => 950.00, "image" => "images/products/brake.png", "featured" => 0]
 ];
 
-// Fetch ALL Products from Database with Auto-Seeding & Sync
 $products = [];
 if (isset($pdo)) {
     try {
@@ -119,6 +115,39 @@ if (isset($pdo)) {
             border: 1px solid #c3e6cb;
             display: block;
         }
+
+        /* Flying Add-to-Cart Slow-Mo Animation Styles */
+        .flying-cart-clone {
+            position: fixed;
+            z-index: 99999;
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #ffc107;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            /* Smooth slow-mo transition */
+            transition: all 1.8s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        @keyframes cartBadgeBounce {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.4);
+                background-color: #ffc107;
+                color: #000;
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .cart-badge-bounce {
+            animation: cartBadgeBounce 0.5s ease-in-out;
+        }
     </style>
 </head>
 
@@ -126,10 +155,8 @@ if (isset($pdo)) {
 
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
-    <!-- ==================== SITE HEADER SECTION ==================== -->
     <?php require_once 'components/header.php'; ?>
 
-    <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
     <main id="main-content" class="container main-content-shop">
         <div class="section-title">
             <h2>All Products & Genuine Parts</h2>
@@ -145,6 +172,14 @@ if (isset($pdo)) {
                 $isFeatured = !empty($p['featured']);
                 $cardClass = $isFeatured ? 'product-card product-card-featured' : 'product-card';
                 $btnClass = $isFeatured ? 'btn btn-cyan btn-block' : 'btn btn-primary btn-block';
+
+                $stockLevel = 0;
+                foreach (['stock_level', 'stock', 'quantity', 'qty'] as $col) {
+                    if (isset($p[$col])) {
+                        $stockLevel = (int)$p[$col];
+                        break;
+                    }
+                }
             ?>
                 <div class="<?= $cardClass ?>" data-name="<?= strtolower(htmlspecialchars($p['name'])) ?>">
                     <div class="product-image">
@@ -152,31 +187,44 @@ if (isset($pdo)) {
                     </div>
                     <h3 class="product-name"><?= htmlspecialchars($p['name']) ?></h3>
                     <div class="product-price"><?= $priceFormatted ?></div>
+
+                    <div class="product-stock" style="font-size: 0.85rem; margin: 5px 0 10px 0; color: <?= ($stockLevel > 0) ? '#2e7d32' : '#c62828' ?>;">
+                        Stock: <strong><?= $stockLevel ?></strong> available
+                    </div>
+
                     <div class="product-card-actions">
-                        <button onclick="addToCart(<?= $p['id'] ?>)" class="btn btn-outline btn-block btn-cart-add"><i class="fa-solid fa-cart-plus"></i></button>
-                        <button type="button" onclick="openBuyModal(<?= $p['id'] ?>, '<?= addslashes(htmlspecialchars($p['name'], ENT_QUOTES)) ?>', <?= is_numeric($p['price']) ? $p['price'] : 0 ?>)" class="<?= $btnClass ?>">Buy Now</button>
+                        <button type="button" onclick="openCartModal(<?= $p['id'] ?>, '<?= addslashes(htmlspecialchars($p['name'], ENT_QUOTES)) ?>', <?= is_numeric($p['price']) ? $p['price'] : 0 ?>, <?= $stockLevel ?>)" class="btn btn-outline btn-block btn-cart-add" <?= ($stockLevel <= 0) ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' ?>><i class="fa-solid fa-cart-plus"></i></button>
+                        <?php if ($stockLevel > 0): ?>
+                            <button type="button" onclick="openBuyModal(<?= $p['id'] ?>, '<?= addslashes(htmlspecialchars($p['name'], ENT_QUOTES)) ?>', <?= is_numeric($p['price']) ? $p['price'] : 0 ?>, <?= $stockLevel ?>)" class="<?= $btnClass ?>">Buy Now</button>
+                        <?php else: ?>
+                            <button type="button" class="btn btn-secondary btn-block" disabled style="background: #ccc; cursor: not-allowed; border-color: #ccc;">Out of Stock</button>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
         </div>
     </main>
 
-    <!-- ==================== SITE FOOTER SECTION ==================== -->
     <?php require_once 'components/footer.php'; ?>
-
-    <!-- ==================== SITE MODALS SECTION ==================== -->
     <?php require_once 'components/modals.php'; ?>
 
-    <!-- ==================== JAVASCRIPT LOGIC SECTION ==================== -->
     <script>
-        const isLoggedIn = <?= isset($_SESSION['user_id']) ? 'true' : 'false' ?>;
+        // Global variables and declarations defined strictly once
+        if (typeof window.isLoggedIn === 'undefined') {
+            window.isLoggedIn = <?= isset($_SESSION['user_id']) ? 'true' : 'false' ?>;
+        }
+        if (typeof window.maxStock === 'undefined') {
+            window.maxStock = 1;
+        }
 
         function openModal(modalId) {
-            document.getElementById(modalId).classList.add('active');
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.add('active');
         }
 
         function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('active');
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.remove('active');
             const alertBox = document.getElementById(modalId + '-alert');
             if (alertBox) {
                 alertBox.className = 'modal-alert';
@@ -197,8 +245,8 @@ if (isset($pdo)) {
             }
         }
 
-        function openBuyModal(productId, productName, productPrice) {
-            if (!isLoggedIn) {
+        function openBuyModal(productId, productName, productPrice, stockLevel = 1) {
+            if (!window.isLoggedIn) {
                 openModal('login-modal');
                 showModalAlert('login-modal', 'Please log in to continue with your purchase.', 'error');
                 return;
@@ -206,7 +254,89 @@ if (isset($pdo)) {
             document.getElementById('buy-product-id').value = productId;
             document.getElementById('buy-product-name').textContent = productName;
             document.getElementById('buy-product-price').textContent = typeof productPrice === 'number' ? '₱' + productPrice.toFixed(2) : productPrice;
+
+            window.maxStock = stockLevel;
+            const qtyInput = document.getElementById('buy-quantity');
+            if (qtyInput) {
+                qtyInput.max = stockLevel;
+                qtyInput.min = 1;
+                qtyInput.value = 1;
+                qtyInput.dataset.productId = productId;
+            }
+            const stockWarning = document.getElementById('buy-stock-warning');
+            if (stockWarning) {
+                stockWarning.style.display = 'none';
+            }
+
             openModal('buy-modal');
+        }
+
+        function openCartModal(productId, productName, productPrice, stockLevel = 1) {
+            if (!window.isLoggedIn) {
+                openModal('login-modal');
+                showModalAlert('login-modal', 'Please log in to add items to your cart.', 'error');
+                return;
+            }
+
+            const modalId = 'cart-modal';
+            const idField = document.getElementById('cart-product-id');
+            const nameEl = document.getElementById('cart-product-name');
+            const priceEl = document.getElementById('cart-product-price');
+            const qtyInput = document.getElementById('cart-quantity');
+            const warning = document.getElementById('cart-stock-warning');
+
+            if (idField) idField.value = productId;
+            if (nameEl) nameEl.textContent = productName;
+            if (priceEl) priceEl.textContent = typeof productPrice === 'number' ? '₱' + productPrice.toFixed(2) : productPrice;
+
+            if (qtyInput) {
+                qtyInput.max = stockLevel;
+                qtyInput.min = 1;
+                qtyInput.value = 1;
+                qtyInput.dataset.maxStock = stockLevel;
+            }
+            if (warning) {
+                warning.style.display = 'none';
+            }
+
+            openModal(modalId);
+        }
+
+        function validateStockLimit() {
+            const qtyInput = document.getElementById('buy-quantity');
+            const warning = document.getElementById('buy-stock-warning');
+            if (qtyInput && warning) {
+                let currentVal = parseInt(qtyInput.value) || 1;
+                if (currentVal > window.maxStock) {
+                    warning.innerText = 'Maximum available stock is ' + window.maxStock;
+                    warning.style.display = 'block';
+                    qtyInput.value = window.maxStock;
+                } else if (currentVal < 1) {
+                    qtyInput.value = 1;
+                    warning.style.display = 'none';
+                } else {
+                    warning.style.display = 'none';
+                }
+            }
+        }
+
+        function validateCartStockLimit() {
+            const qtyInput = document.getElementById('cart-quantity');
+            const warning = document.getElementById('cart-stock-warning');
+            if (qtyInput && warning) {
+                let maxStockVal = parseInt(qtyInput.dataset.maxStock) || 1;
+                let currentVal = parseInt(qtyInput.value) || 1;
+                if (currentVal > maxStockVal) {
+                    warning.innerText = 'Maximum available stock is ' + maxStockVal;
+                    warning.style.display = 'block';
+                    qtyInput.value = maxStockVal;
+                } else if (currentVal < 1) {
+                    qtyInput.value = 1;
+                    warning.style.display = 'none';
+                } else {
+                    warning.style.display = 'none';
+                }
+            }
         }
 
         function togglePasswordVisibility(fieldId, btn) {
@@ -221,23 +351,6 @@ if (isset($pdo)) {
             }
         }
 
-        function addToCart(productId) {
-            fetch('cart_action.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: `action=add&product_id=${productId}&csrf_token=<?= $_SESSION['csrf_token'] ?>`
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('cart-count-badge').textContent = data.cart_count;
-                    }
-                })
-                .catch(() => {});
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             const navToggleBtn = document.getElementById('nav-toggle-btn');
             const mainNav = document.getElementById('main-nav');
@@ -247,6 +360,11 @@ if (isset($pdo)) {
                     navToggleBtn.setAttribute('aria-expanded', !expanded);
                     mainNav.classList.toggle('active');
                 });
+            }
+
+            const qtyInput = document.getElementById('buy-quantity');
+            if (qtyInput) {
+                qtyInput.addEventListener('input', validateStockLimit);
             }
 
             const searchInput = document.getElementById('product-search-input');
@@ -263,7 +381,7 @@ if (isset($pdo)) {
 
             document.querySelectorAll('.requires-auth').forEach(button => {
                 button.addEventListener('click', function(e) {
-                    if (!isLoggedIn) {
+                    if (!window.isLoggedIn) {
                         e.preventDefault();
                         openModal('login-modal');
                         showModalAlert('login-modal', 'Please log in to continue.', 'error');
@@ -282,37 +400,6 @@ if (isset($pdo)) {
                 }
             });
 
-            function handleFormSubmit(formId, endpoint, modalId) {
-                const form = document.getElementById(formId);
-                if (form) {
-                    form.addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        const formData = new FormData(form);
-
-                        fetch(endpoint, {
-                                method: 'POST',
-                                body: formData
-                            })
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data.success) {
-                                    showModalAlert(modalId, data.message || 'Success!', 'success');
-                                    if (data.redirect) {
-                                        setTimeout(() => window.location.href = data.redirect, 1000);
-                                    } else {
-                                        setTimeout(() => window.location.reload(), 1000);
-                                    }
-                                } else {
-                                    showModalAlert(modalId, data.message || 'An error occurred.', 'error');
-                                }
-                            })
-                            .catch(() => {
-                                showModalAlert(modalId, 'Request failed. Please try again.', 'error');
-                            });
-                    });
-                }
-            }
-            
             const currentPath = window.location.pathname.split("/").pop();
             const navLinks = document.querySelectorAll(".main-nav a, .header-nav-link");
             navLinks.forEach(link => {
@@ -326,10 +413,118 @@ if (isset($pdo)) {
                 }
             });
 
+            function handleFormSubmit(formId, endpoint, modalId) {
+                const form = document.getElementById(formId);
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const formData = new FormData(form);
+
+                        // Capture product context and original button position if submitting from cart modal
+                        let sourceImg = null;
+                        let startRect = null;
+                        if (formId === 'ajax-cart-form') {
+                            const prodId = formData.get('product_id');
+                            const card = document.querySelector(`.product-card [onclick*="openCartModal(${prodId},"]`)?.closest('.product-card');
+                            if (card) {
+                                sourceImg = card.querySelector('.product-image img');
+                                if (sourceImg) {
+                                    startRect = sourceImg.getBoundingClientRect();
+                                }
+                            }
+                        }
+
+                        fetch(endpoint, {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                // 1. Display success message inside the modal first
+                                showModalAlert(modalId, data.message || 'Successfully added to cart!', 'success');
+
+                                if (formId === 'ajax-buy-form') {
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 1000);
+                                } else if (formId === 'ajax-cart-form') {
+                                    // 2. Keep modal open briefly to let user read the success alert, then close it and trigger the slow-mo animation
+                                    setTimeout(() => {
+                                        closeModal(modalId);
+
+                                        if (sourceImg && startRect) {
+                                            const cartIcon = document.querySelector('.header-cart-link, .fa-cart-shopping');
+                                            if (cartIcon) {
+                                                const cartRect = cartIcon.getBoundingClientRect();
+
+                                                const clone = document.createElement('img');
+                                                clone.src = sourceImg.src;
+                                                clone.className = 'flying-cart-clone';
+                                                clone.style.left = startRect.left + 'px';
+                                                clone.style.top = startRect.top + 'px';
+                                                // Start at normal size relative to card image
+                                                clone.style.transform = 'scale(1)';
+                                                document.body.appendChild(clone);
+
+                                                // Force reflow
+                                                clone.getBoundingClientRect();
+
+                                                // Stage 1 (Midway): Move towards cart and get bigger (magnify effect)
+                                                setTimeout(() => {
+                                                    const midX = (startRect.left + cartRect.left) / 2;
+                                                    const midY = Math.min(startRect.top, cartRect.top) - 80;
+                                                    clone.style.left = midX + 'px';
+                                                    clone.style.top = midY + 'px';
+                                                    clone.style.transform = 'scale(1.7)';
+                                                }, 40);
+
+                                                // Stage 2 (Arrival): Reach top right cart icon and normalize/shrink back down as it enters
+                                                setTimeout(() => {
+                                                    clone.style.left = (cartRect.left + cartRect.width / 2 - 25) + 'px';
+                                                    clone.style.top = (cartRect.top + cartRect.height / 2 - 25) + 'px';
+                                                    clone.style.opacity = '0.2';
+                                                    clone.style.transform = 'scale(0.3)';
+                                                }, 950);
+
+                                                // Cleanup clone and bounce header badge when finished
+                                                setTimeout(() => {
+                                                    clone.remove();
+                                                    if (typeof data.cart_count !== 'undefined') {
+                                                        const badge = document.getElementById('cart-count-badge');
+                                                        if (badge) {
+                                                            badge.textContent = data.cart_count;
+                                                            badge.classList.add('cart-badge-bounce');
+                                                            setTimeout(() => badge.classList.remove('cart-badge-bounce'), 500);
+                                                        }
+                                                    }
+                                                }, 1820);
+                                            }
+                                        }
+                                    }, 800); // Wait 800ms so user clearly sees the success alert inside the modal before it closes
+                                } else {
+                                    if (data.redirect) {
+                                        setTimeout(() => window.location.href = data.redirect, 1000);
+                                    } else {
+                                        setTimeout(() => window.location.reload(), 1000);
+                                    }
+                                }
+                            } else {
+                                showModalAlert(modalId, data.message || 'An error occurred.', 'error');
+                            }
+                        })
+                        .catch(() => {
+                            showModalAlert(modalId, 'Request failed. Please try again.', 'error');
+                        });
+                    });
+                }
+            }
+
             handleFormSubmit('ajax-login-form', 'login.php', 'login-modal');
             handleFormSubmit('ajax-register-form', 'register.php', 'register-modal');
             handleFormSubmit('ajax-forgot-form', 'forgot_password.php', 'forgot-modal');
             handleFormSubmit('ajax-buy-form', 'process_checkout.php', 'buy-modal');
+            handleFormSubmit('ajax-cart-form', 'cart_action.php', 'cart-modal');
         });
     </script>
 </body>
