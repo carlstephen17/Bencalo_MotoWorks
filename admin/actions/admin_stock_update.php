@@ -1,8 +1,9 @@
 <?php
 // /admin/actions/admin_stock_update.php
 session_start();
-require_once 'includes/config.php';
-require_once 'includes/auth.php';
+require_once '../includes/config.php';
+/** @var PDO $pdo */
+require_once '../includes/auth.php';
 
 if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     header('Location: ../../login.php');

@@ -11,11 +11,12 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 }
 
 // Fetch all products ordered by ID in ascending order
-$stmt = $pdo->query("SELECT id, name, price, image, active, featured FROM products ORDER BY id ASC");
+$stmt = $pdo->query("SELECT id, name, price, image, active, stock FROM products ORDER BY id ASC");
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,24 +25,11 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="css/admin_layout.css">
     <link rel="stylesheet" href="css/admin_products.css">
 </head>
+
 <body>
 
     <div class="admin-layout">
-        <!-- SIDEBAR -->
-        <aside class="admin-sidebar">
-            <div class="sidebar-brand">
-                <h2>MotoWorks Admin</h2>
-            </div>
-            <ul class="sidebar-menu">
-                <li><a href="admin_index.php"><i class="fas fa-chart-bar"></i> Dashboard</a></li>
-                <li class="active"><a href="admin_products.php"><i class="fas fa-box"></i> Products</a></li>
-                <li><a href="admin_inventory.php"><i class="fas fa-clipboard-list"></i> Inventory / Stock</a></li>
-                <li><a href="admin_services.php"><i class="fas fa-tools"></i> Services</a></li>
-                <li><a href="admin_orders.php"><i class="fas fa-shopping-cart"></i> Orders</a></li>
-                <li><a href="admin_users.php"><i class="fas fa-users"></i> Users / Customers</a></li>
-                <li class="sidebar-logout"><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            </ul>
-        </aside>
+        <?php include 'includes/admin_sidebar.php'; ?>
 
         <!-- MAIN CONTENT AREA -->
         <main class="admin-main">
@@ -57,6 +45,16 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="alert-toast"><?= htmlspecialchars($_GET['msg']) ?></div>
                 <?php endif; ?>
 
+                <!-- LIVE SEARCH & STATUS FILTER TOOLBAR -->
+                <div class="table-filters" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 15px; flex-wrap: wrap;">
+                    <input type="text" id="liveSearch" class="form-control" placeholder="Search products by name..." style="flex: 1;">
+                    <select id="statusFilter" class="form-control" style="width: 200px; flex-shrink: 0;">
+                        <option value="">All Statuses</option>
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                    </select>
+                </div>
+
                 <div class="table-responsive">
                     <table class="admin-table">
                         <thead>
@@ -66,18 +64,18 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <th>Product Name</th>
                                 <th>Price</th>
                                 <th>Status</th>
-                                <th>Featured</th>
+                                <th>Stock</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($products)): ?>
-                                <tr>
+                                <tr id="noProductsRow">
                                     <td colspan="7" class="text-center">No products found.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($products as $p): ?>
-                                    <tr>
+                                    <tr data-name="<?= htmlspecialchars(strtolower($p['name'])) ?>" data-status="<?= $p['active'] ?>">
                                         <td><?= $p['id'] ?></td>
                                         <td>
                                             <?php if (!empty($p['image'])): ?>
@@ -94,8 +92,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge" style="<?= ($p['featured'] == 1) ? 'background: #dcfce7; color: #166534;' : 'background: #e2e8f0; color: #475569;' ?>">
-                                                <?= ($p['featured'] == 1) ? 'Yes' : 'No' ?>
+                                            <span class="badge" style="background: #e2e8f0; color: #475569;">
+                                                <?= intval($p['stock'] ?? 0) ?>
                                             </span>
                                         </td>
                                         <td>
@@ -141,8 +139,8 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <p id="view_active" class="form-control-static" style="margin: 0; color: #1e293b;"></p>
             </div>
             <div class="form-group">
-                <label><strong>Featured:</strong></label>
-                <p id="view_featured" class="form-control-static" style="margin: 0; color: #1e293b;"></p>
+                <label><strong>Stock:</strong></label>
+                <p id="view_stock" class="form-control-static" style="margin: 0; color: #1e293b;"></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="closeModal('viewProductModal')">Close</button>
@@ -159,7 +157,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <form action="actions/admin_product_create.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= generateCSRFToken() ?>">
-                
+
                 <div class="form-group">
                     <label>Product Name:</label>
                     <input type="text" name="name" required class="form-control">
@@ -167,6 +165,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="form-group">
                     <label>Price:</label>
                     <input type="number" step="0.01" name="price" required class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Stock Quantity:</label>
+                    <input type="number" name="stock" value="0" min="0" required class="form-control">
                 </div>
                 <div class="form-group">
                     <label>Image Path / File:</label>
@@ -177,13 +179,6 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <select name="active" class="form-control">
                         <option value="1" selected>Active</option>
                         <option value="0">Inactive</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Featured:</label>
-                    <select name="featured" class="form-control">
-                        <option value="0" selected>No</option>
-                        <option value="1">Yes</option>
                     </select>
                 </div>
                 <div class="modal-footer">
@@ -204,7 +199,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <form action="actions/admin_product_update.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= generateCSRFToken() ?>">
                 <input type="hidden" name="id" id="edit_id">
-                
+
                 <div class="form-group">
                     <label>Product Name:</label>
                     <input type="text" name="name" id="edit_name" required class="form-control">
@@ -212,6 +207,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="form-group">
                     <label>Price:</label>
                     <input type="number" step="0.01" name="price" id="edit_price" required class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Stock Quantity:</label>
+                    <input type="number" name="stock" id="edit_stock" min="0" required class="form-control">
                 </div>
                 <div class="form-group">
                     <label>Image (Leave blank to keep current):</label>
@@ -222,13 +221,6 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <select name="active" id="edit_active" class="form-control">
                         <option value="1">Active</option>
                         <option value="0">Inactive</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Featured:</label>
-                    <select name="featured" id="edit_featured" class="form-control">
-                        <option value="0">No</option>
-                        <option value="1">Yes</option>
                     </select>
                 </div>
                 <div class="modal-footer">
@@ -254,7 +246,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             document.getElementById('view_name').innerText = product.name;
             document.getElementById('view_price').innerText = '₱' + parseFloat(product.price).toFixed(2);
             document.getElementById('view_active').innerText = product.active == 1 ? 'Active' : 'Inactive';
-            document.getElementById('view_featured').innerText = product.featured == 1 ? 'Yes' : 'No';
+            document.getElementById('view_stock').innerText = product.stock ?? 0;
 
             const imgElement = document.getElementById('view_image');
             const noImgElement = document.getElementById('view_no_image');
@@ -276,9 +268,37 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             document.getElementById('edit_name').value = product.name;
             document.getElementById('edit_price').value = product.price;
             document.getElementById('edit_active').value = product.active;
-            document.getElementById('edit_featured').value = product.featured;
+            document.getElementById('edit_stock').value = product.stock ?? 0;
             openModal('editProductModal');
         }
+
+        // Live Search & Status Filter Logic
+        const liveSearch = document.getElementById('liveSearch');
+        const statusFilter = document.getElementById('statusFilter');
+        const tableRows = document.querySelectorAll('.admin-table tbody tr[data-name]');
+
+        function filterProducts() {
+            const searchTerm = liveSearch.value.toLowerCase().trim();
+            const statusValue = statusFilter.value;
+
+            tableRows.forEach(row => {
+                const name = row.getAttribute('data-name');
+                const status = row.getAttribute('data-status');
+
+                const matchesSearch = name.includes(searchTerm);
+                const matchesStatus = (statusValue === "" || status === statusValue);
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        liveSearch.addEventListener('keyup', filterProducts);
+        statusFilter.addEventListener('change', filterProducts);
     </script>
 </body>
+
 </html>

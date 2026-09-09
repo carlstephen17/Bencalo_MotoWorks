@@ -18,11 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $name = trim($_POST['name'] ?? '');
-    $category = trim($_POST['category'] ?? '');
-    $price = filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT);
-    $stock = filter_input(INPUT_POST, 'stock', FILTER_VALIDATE_INT);
+    $price = isset($_POST['price']) ? filter_var($_POST['price'], FILTER_VALIDATE_FLOAT) : false;
+    $stock = isset($_POST['stock']) ? filter_var($_POST['stock'], FILTER_VALIDATE_INT) : false;
 
-    $imageName = null;
+    $imageName = '';
     if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
         $fileTmpPath = $_FILES['image']['tmp_name'];
         $fileName = $_FILES['image']['name'];
@@ -39,14 +38,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $dest_path = $uploadFileDir . $newFileName;
             if (move_uploaded_file($fileTmpPath, $dest_path)) {
-                $imageName = $newFileName;
+                $imageName = 'uploads/' . $newFileName;
             }
         }
     }
 
     if (!empty($name) && $price !== false && $price >= 0 && $stock !== false && $stock >= 0) {
-        $stmt = $pdo->prepare("INSERT INTO products (name, category, price, stock, image) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $category, $price, $stock, $imageName]);
+        $stmt = $pdo->prepare("INSERT INTO products (name, price, stock, image) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$name, $price, $stock, $imageName]);
 
         header('Location: ../admin_products.php?msg=Product+successfully+created');
         exit();

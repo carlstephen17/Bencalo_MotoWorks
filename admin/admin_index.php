@@ -1,8 +1,5 @@
 <?php
 // /admin/admin_index.php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 session_start();
 require_once '../includes/config.php';
 /** @var PDO $pdo */
@@ -45,22 +42,7 @@ $recentOrders = $recentOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
 <body>
 
     <div class="admin-layout">
-        <!-- SIDEBAR -->
-        <aside class="admin-sidebar">
-            <div class="sidebar-brand">
-                <h2>MotoWorks Admin</h2>
-            </div>
-            <ul class="sidebar-menu">
-                <li class="active"><a href="admin_index.php"><i class="fas fa-chart-bar"></i> Dashboard</a></li>
-                <li><a href="admin_products.php"><i class="fas fa-box"></i> Products</a></li>
-                <li><a href="admin_inventory.php"><i class="fas fa-clipboard-list"></i> Inventory / Stock</a></li>
-                <li><a href="admin_services.php"><i class="fas fa-tools"></i> Services</a></li>
-                <li><a href="admin_orders.php"><i class="fas fa-shopping-cart"></i> Orders</a></li>
-                <li><a href="admin_users.php"><i class="fas fa-users"></i> Users / Customers</a></li>
-                <li><a href="admin_promos.php"><i class="fas fa-tags"></i> Promos & Claims</a></li>
-                <li class="sidebar-logout"><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            </ul>
-        </aside>
+        <?php include 'includes/admin_sidebar.php'; ?>
 
         <!-- MAIN CONTENT AREA -->
         <main class="admin-main">

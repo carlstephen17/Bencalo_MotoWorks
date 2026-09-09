@@ -11,11 +11,12 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 }
 
 // Fetch all registered users/customers (excluding passwords)
-$stmt = $pdo->query("SELECT id, username, first_name, last_name, email, phone, role, created_at FROM users ORDER BY id DESC");
+$stmt = $pdo->query("SELECT id, username, first_name, last_name, email, phone, role, created_at FROM users ORDER BY id ASC");
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,58 +25,153 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="css/admin_layout.css">
     <link rel="stylesheet" href="css/admin_products.css">
     <style>
-        .action-btn { 
-            display: inline-flex; 
-            align-items: center; 
-            justify-content: center; 
-            width: 30px; 
-            height: 30px; 
-            border: none; 
-            border-radius: 4px; 
-            color: #fff; 
-            cursor: pointer; 
-            font-size: 0.85rem; 
-            margin-right: 4px; 
-            transition: opacity 0.2s; 
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-right: 4px;
+            transition: opacity 0.2s;
         }
-        .view-btn { background-color: #6c757d; }
-        .edit-btn { background-color: #1976d2; }
-        .delete-btn { background-color: #d32f2f; }
-        .action-btn:hover { opacity: 0.85; }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-box { background: #fff; padding: 25px 30px; border-radius: 8px; width: 100%; max-width: 450px; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.15); color: #333; }
-        .modal-box h3 { margin-bottom: 20px; font-size: 1.3rem; color: #333; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9rem; color: #555; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95rem; box-sizing: border-box; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .btn-submit { background: #1976d2; color: #fff; padding: 8px 16px; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
-        .btn-secondary { background: #e0e0e0; color: #333; padding: 8px 16px; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
-        .btn-danger { background: #d32f2f; color: #fff; padding: 8px 16px; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
-        .close-modal { position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #777; }
-        .detail-row { margin-bottom: 10px; font-size: 0.95rem; }
-        .detail-row strong { display: inline-block; width: 110px; color: #555; }
+        .view-btn {
+            background-color: #6c757d;
+        }
+
+        .edit-btn {
+            background-color: #1976d2;
+        }
+
+        .delete-btn {
+            background-color: #d32f2f;
+        }
+
+        .action-btn:hover {
+            opacity: 0.85;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-box {
+            background: #fff;
+            padding: 25px 30px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 450px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            color: #333;
+        }
+
+        .modal-box h3 {
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-submit {
+            background: #1976d2;
+            color: #fff;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            background: #d32f2f;
+            color: #fff;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #777;
+        }
+
+        .detail-row {
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        .detail-row strong {
+            display: inline-block;
+            width: 110px;
+            color: #555;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="admin-layout">
-        <!-- SIDEBAR -->
-        <aside class="admin-sidebar">
-            <div class="sidebar-brand">
-                <h2>MotoWorks Admin</h2>
-            </div>
-            <ul class="sidebar-menu">
-                <li><a href="admin_index.php"><i class="fas fa-chart-bar"></i> Dashboard</a></li>
-                <li><a href="admin_products.php"><i class="fas fa-box"></i> Products</a></li>
-                <li><a href="admin_inventory.php"><i class="fas fa-clipboard-list"></i> Inventory / Stock</a></li>
-                <li><a href="admin_services.php"><i class="fas fa-tools"></i> Services</a></li>
-                <li><a href="admin_orders.php"><i class="fas fa-shopping-cart"></i> Orders</a></li>
-                <li class="active"><a href="actions/admin_users.php"><i class="fas fa-users"></i> Users / Customers</a></li>
-                <li class="sidebar-logout"><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-            </ul>
-        </aside>
+        <?php include 'includes/admin_sidebar.php'; ?>
 
         <!-- MAIN CONTENT AREA -->
         <main class="admin-main">
@@ -90,6 +186,16 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <?php if (isset($_GET['msg'])): ?>
                     <div class="alert-toast" style="background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px;"><?= htmlspecialchars($_GET['msg']) ?></div>
                 <?php endif; ?>
+
+                <!-- Live Search & Role Filter Bar -->
+                <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <input type="text" id="liveSearchInput" placeholder="Search username, name, email, or phone..." class="form-control" style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff;">
+                    <select id="roleFilterSelect" class="form-control" style="width: 180px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff;">
+                        <option value="">All Roles</option>
+                        <option value="admin">Admin</option>
+                        <option value="customer">Customer</option>
+                    </select>
+                </div>
 
                 <div class="table-responsive">
                     <table class="admin-table">
@@ -107,19 +213,19 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </thead>
                         <tbody>
                             <?php if (empty($users)): ?>
-                                <tr>
-                                    <td colspan="8" class="text-center">No users found.</td>
+                                <tr id="noRecordsRow">
+                                    <td colspan="8" class="text-center" style="padding: 30px; color: #64748b;">No users found.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($users as $u): ?>
-                                    <tr>
+                                    <tr class="user-row">
                                         <td><?= $u['id'] ?></td>
                                         <td><?= htmlspecialchars($u['username']) ?></td>
                                         <td><?= htmlspecialchars(trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''))) ?: 'N/A' ?></td>
                                         <td><?= htmlspecialchars($u['email'] ?? 'N/A') ?></td>
                                         <td><?= htmlspecialchars($u['phone'] ?? 'N/A') ?></td>
                                         <td>
-                                            <span class="badge" style="padding: 4px 8px; border-radius: 4px; background: 
+                                            <span class="badge role-badge" style="padding: 4px 8px; border-radius: 4px; background: 
                                                 <?= ($u['role'] === 'admin') ? '#e3f2fd; color: #1976d2;' : '#f3e5f5; color: #7b1fa2;' ?>">
                                                 <?= htmlspecialchars(ucfirst($u['role'] ?? 'user')) ?>
                                             </span>
@@ -259,6 +365,41 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
             });
         }
+
+        // Live Search and Instant Role Filter Script
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('liveSearchInput');
+            const roleSelect = document.getElementById('roleFilterSelect');
+            const userRows = document.querySelectorAll('.user-row');
+
+            function liveFilter() {
+                const query = searchInput.value.toLowerCase().trim();
+                const selectedRole = roleSelect.value.toLowerCase();
+
+                userRows.forEach(row => {
+                    const textContent = row.textContent.toLowerCase();
+                    const roleBadge = row.querySelector('.role-badge');
+                    const roleText = roleBadge ? roleBadge.textContent.trim().toLowerCase() : '';
+
+                    const matchesSearch = query === '' || textContent.includes(query);
+                    const matchesRole = selectedRole === '' || roleText === selectedRole;
+
+                    if (matchesSearch && matchesRole) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', liveFilter);
+            }
+            if (roleSelect) {
+                roleSelect.addEventListener('change', liveFilter);
+            }
+        });
     </script>
 </body>
+
 </html>
