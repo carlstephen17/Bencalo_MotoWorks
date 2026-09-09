@@ -17,15 +17,15 @@ $cart_count = $cart_count ?? 0;
                 <li><a href="index.php">Home</a></li>
                 <li><a href="shop.php">Shop</a></li>
                 <li><a href="services.php">Services</a></li>
-                <li><a href="#about">About Us</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="about.php">About Us</a></li>
+                <li><a href="contact.php">Contact</a></li>
             </ul>
         </nav>
 
         <div class="header-cta-group">
-            <a href="cart.php" class="cart-link-icon" aria-label="Shopping Cart">
+            <a href="cart.php" class="header-cart-link">
                 <i class="fa-solid fa-cart-shopping"></i>
-                <span class="cart-badge" id="cart-count-badge"><?= $cart_count ?></span>
+                <span id="cart-count-badge" class="cart-badge"><?= $cart_count ?? 0 ?></span>
             </a>
 
             <a href="services.php" class="btn btn-primary">Book Appointment</a>
