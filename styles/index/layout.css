@@ -2,8 +2,10 @@
    HEADER & NAVIGATION
    ========================================================================== */
 .site-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  width: 100%;
   z-index: 100;
   background: rgba(10, 14, 23, 0.95);
   backdrop-filter: blur(6px);
