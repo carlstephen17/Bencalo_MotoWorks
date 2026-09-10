@@ -132,7 +132,9 @@ $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </td>
                                         <td>
                                             <button class="btn-sm btn-secondary" title="View Details" onclick="openViewModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-sm btn-primary" title="Edit Record" onclick="openEditModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-edit"></i></button>
+                                            <?php if (strtoupper($status) !== 'COMPLETED'): ?>
+                                                <button class="btn-sm btn-primary" title="Edit Record" onclick="openEditModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-edit"></i></button>
+                                            <?php endif; ?>
                                             <a href="actions/admin_promo_history_delete.php?id=<?= $row['id'] ?>" class="btn-sm btn-danger" title="Delete Record" onclick="return confirm('Are you sure you want to delete this promo claim record?');"><i class="fas fa-trash"></i></a>
                                         </td>
                                     </tr>

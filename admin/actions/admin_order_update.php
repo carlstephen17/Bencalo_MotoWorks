@@ -27,8 +27,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $allowedStatuses = ['Pending', 'Processing', 'Completed', 'Cancelled'];
 
     if ($orderId && $userId && $productId && $totalAmount !== false && in_array($status, $allowedStatuses) && !empty($createdAt)) {
-        $stmt = $pdo->prepare("UPDATE orders SET user_id = ?, product_id = ?, total_amount = ?, status = ?, created_at = ? WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE orders SET user_id = ?, product_id = ?, total_amount = ?, status = ?, created_at = ? WHERE id = ? AND status <> 'Completed'");
         $stmt->execute([$userId, $productId, $totalAmount, $status, $createdAt, $orderId]);
+
+        if ($stmt->rowCount() === 0) {
+            header('Location: ../admin_orders.php?msg=Completed+orders+cannot+be+edited');
+            exit();
+        }
 
         header('Location: ../admin_orders.php?msg=Order+successfully+updated');
         exit();

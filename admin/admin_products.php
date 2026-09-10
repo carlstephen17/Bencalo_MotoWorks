@@ -97,7 +97,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn-sm btn-warning" onclick="openViewModal(<?= htmlspecialchars(json_encode($p)) ?>)" title="View"><i class="fas fa-eye"></i></button>
+                                            <button class="btn-sm btn-secondary" onclick="openViewModal(<?= htmlspecialchars(json_encode($p)) ?>)" title="View"><i class="fas fa-eye"></i></button>
                                             <button class="btn-sm btn-info" onclick="openEditModal(<?= htmlspecialchars(json_encode($p)) ?>)" title="Edit"><i class="fas fa-edit"></i></button>
                                             <a href="actions/admin_product_delete.php?id=<?= $p['id'] ?>" class="btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this product?');" title="Delete"><i class="fas fa-trash"></i></a>
                                         </td>

@@ -58,12 +58,6 @@ $appointment_id = filter_input(
 
 $full_name = trim($_POST['full_name'] ?? '');
 
-$user_id = filter_input(
-    INPUT_POST,
-    'users_id',
-    FILTER_VALIDATE_INT
-);
-
 $contact_number = trim(
     $_POST['contact_number'] ?? ''
 );
@@ -120,7 +114,6 @@ if (!in_array($status, $allowed_statuses, true)) {
 
 if (
     !$appointment_id ||
-    !$user_id ||
     empty($full_name) ||
     !preg_match('/^09[0-9]{9}$/', $contact_number) ||
     !$services_id ||
@@ -171,7 +164,6 @@ try {
     $stmt = $pdo->prepare("
         UPDATE service_bookings
         SET
-            user_id = ?,
             full_name = ?,
             contact_number = ?,
             vehicle_model = ?,
@@ -180,12 +172,11 @@ try {
             booking_time = ?,
             status = ?,
             notes = ?
-        WHERE id = ?
+        WHERE id = ? AND LOWER(TRIM(status)) <> 'completed'
     ");
 
 
     $stmt->execute([
-        $user_id,
         $full_name,
         $contact_number,
         $vehicle_model,
@@ -196,6 +187,14 @@ try {
         $notes,
         $appointment_id
     ]);
+
+    if ($stmt->rowCount() === 0) {
+        header(
+            'Location: ../admin_appointment.php?msg=' .
+            urlencode('Completed appointments cannot be edited')
+        );
+        exit();
+    }
 
 
     // =====================================================

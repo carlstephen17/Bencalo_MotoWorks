@@ -170,7 +170,8 @@ if (isset($_GET['ajax'])) {
 
 
             // EDIT BUTTON
-            echo '<button
+            if (strtoupper($statusVal) !== 'COMPLETED') {
+                echo '<button
                     type="button"
                     class="btn-sm btn-edit-order"
                     data-id="' . $order['id'] . '"
@@ -184,7 +185,8 @@ if (isset($_GET['ajax'])) {
 
                     <i class="fas fa-edit"></i>
 
-                  </button>';
+                </button>';
+            }
 
 
             // DELETE BUTTON
@@ -567,7 +569,7 @@ $allUsers = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 
 
                                         <!-- EDIT -->
-
+                                        <?php if (strtoupper($statusVal) !== 'COMPLETED'): ?>
                                         <button
                                             type="button"
                                             class="btn-sm btn-edit-order"
@@ -583,6 +585,7 @@ $allUsers = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
                                             <i class="fas fa-edit"></i>
 
                                         </button>
+                                        <?php endif; ?>
 
 
                                         <!-- DELETE -->

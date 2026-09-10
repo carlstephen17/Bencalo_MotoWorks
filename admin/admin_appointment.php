@@ -379,11 +379,14 @@ if (isset($_GET['ajax'])) {
             // EDIT BUTTON
             // ------------------------------------------------
 
-            echo '<button
+            if (strtoupper(trim((string) $status)) !== 'COMPLETED') {
+                echo '<button
                     type="button"
                     class="btn-sm btn-edit-appointment"
 
                     data-id="' . $appointment['id'] . '"
+
+                    data-userid="' . ($appointment['user_id'] ?? '') . '"
 
                     data-customer="' .
                         htmlspecialchars(
@@ -456,6 +459,7 @@ if (isset($_GET['ajax'])) {
                     <i class="fas fa-edit"></i>
 
                 </button>';
+            }
 
 
             // ------------------------------------------------
@@ -1064,7 +1068,7 @@ $allUsers =
 
 
                                         <!-- EDIT -->
-
+                                        <?php if (strtoupper(trim((string) $status)) !== 'COMPLETED'): ?>
                                         <button
                                             type="button"
 
@@ -1105,6 +1109,7 @@ $allUsers =
                                             <i class="fas fa-edit"></i>
 
                                         </button>
+                                        <?php endif; ?>
 
 
                                         <!-- DELETE -->
@@ -1466,7 +1471,13 @@ $allUsers =
             >
 
 
-            <!-- CUSTOMER -->
+            <!-- CUSTOMER IS PRESERVED FROM THE SELECTED APPOINTMENT -->
+
+            <input
+                type="hidden"
+                name="users_id"
+                id="modal_users_id"
+            >
 
             <div
                 class="form-group"
@@ -1485,39 +1496,19 @@ $allUsers =
 
                 </label>
 
-
-                <select
-                    name="users_id"
-                    id="modal_users_id"
-
+                <input
+                    type="text"
+                    id="modal_customer_display"
                     class="form-control"
-
                     style="
                         width: 100%;
                         padding: 8px;
                         border: 1px solid #ced4da;
                         border-radius: 4px;
+                        background: #f8f9fa;
                     "
-
-                    required
+                    readonly
                 >
-
-                    <option value="">
-                        Select Customer
-                    </option>
-
-
-                    <?php foreach ($allUsers as $user): ?>
-
-                        <option value="<?= $user['id'] ?>">
-
-                            <?= htmlspecialchars($user['username']) ?>
-
-                        </option>
-
-                    <?php endforeach; ?>
-
-                </select>
 
             </div>
 
@@ -1769,22 +1760,27 @@ $allUsers =
                 </label>
 
 
-                <input
-                    type="time"
+                <select
                     name="booking_time"
                     id="modal_booking_time"
-
                     class="form-control"
-
                     style="
                         width: 100%;
                         padding: 8px;
                         border: 1px solid #ced4da;
                         border-radius: 4px;
                     "
-
                     required
                 >
+                    <option value="" disabled selected>Select time slot</option>
+                    <option value="09:00 AM - 10:30 AM">09:00 AM - 10:30 AM</option>
+                    <option value="10:30 AM - 12:00 PM">10:30 AM - 12:00 PM</option>
+                    <option value="01:00 PM - 02:30 PM">01:00 PM - 02:30 PM</option>
+                    <option value="02:30 PM - 04:00 PM">02:30 PM - 04:00 PM</option>
+                    <option value="04:00 PM - 05:30 PM">04:00 PM - 05:30 PM</option>
+                </select>
+
+                </select>
 
             </div>
 
@@ -2320,21 +2316,24 @@ $allUsers =
                 </label>
 
 
-                <input
-                    type="time"
+                <select
                     name="booking_time"
-
                     class="form-control"
-
                     style="
                         width: 100%;
                         padding: 8px;
                         border: 1px solid #ced4da;
                         border-radius: 4px;
                     "
-
                     required
                 >
+                    <option value="" disabled selected>Select time slot</option>
+                    <option value="09:00 AM - 10:30 AM">09:00 AM - 10:30 AM</option>
+                    <option value="10:30 AM - 12:00 PM">10:30 AM - 12:00 PM</option>
+                    <option value="01:00 PM - 02:30 PM">01:00 PM - 02:30 PM</option>
+                    <option value="02:30 PM - 04:00 PM">02:30 PM - 04:00 PM</option>
+                    <option value="04:00 PM - 05:30 PM">04:00 PM - 05:30 PM</option>
+                </select>
 
             </div>
 
@@ -2753,6 +2752,11 @@ document.addEventListener(
                         'modal_users_id'
                     ).value =
                         ds.userid;
+
+                    document.getElementById(
+                        'modal_customer_display'
+                    ).value =
+                        ds.customer;
 
 
                     document.getElementById(

@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($id > 0) {
-        $stmt = $pdo->prepare("UPDATE promo_claims SET status = ? WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE promo_claims SET status = ? WHERE id = ? AND status <> 'Completed'");
         if ($stmt->execute([$status, $id])) {
             header('Location: ../admin_promos.php?msg=Promo+claim+updated+successfully');
             exit();
