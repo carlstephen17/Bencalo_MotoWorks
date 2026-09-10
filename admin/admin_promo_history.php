@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 // Fetch all records for fast, responsive client-side live search and filtering
 $query = "SELECT pc.*, u.username as user_username 
           FROM promo_claims pc 
-          LEFT JOIN users u ON pc.user_id = u.id 
+          LEFT JOIN users u ON pc.users_id = u.id
           ORDER BY pc.id DESC";
 $stmt = $pdo->prepare($query);
 $stmt->execute();

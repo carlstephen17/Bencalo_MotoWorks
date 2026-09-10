@@ -1,3 +1,7 @@
+/* ==========================================================
+   BENCALO MOTOWORKS - UNIFIED STYLESHEET
+   ========================================================== */
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;
@@ -26,9 +30,11 @@
 .toast.success {
   background-color: #2ed573;
 }
+
 .toast.error {
   background-color: #ff4757;
 }
+
 .toast.info {
   background-color: #1e90ff;
 }
@@ -142,69 +148,110 @@
   border: 1px solid var(--color-primary, #00d2d3);
   background: var(--color-bg-alt, #1e272e);
   color: #fff;
+  outline: none;
 }
 
-/* Grid & Card Uniform Sizing (Matching Shop & Services) */
+/* Grid & Card Layouts */
 .products-grid,
-.services-grid {
+.services-grid,
+.service-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  gap: 24px;
+  align-items: stretch;
 }
 
 .product-card,
 .service-card {
-  background: var(--color-bg-alt, #1e272e);
-  border: 1px solid var(--color-primary, #00d2d3);
-  border-radius: var(--radius-sm, 6px);
-  padding: 16px;
+  background: #15181c;
+  border: 1px solid #2b2f38;
+  border-radius: var(--radius-sm, 12px);
+  padding: 20px;
+  min-height: 380px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 100%;
   box-sizing: border-box;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
+.product-card:hover,
+.service-card:hover {
+  border-color: #00FFFF;
+  transform: translateY(-4px);
+}
+
+.product-image,
 .product-card-image-container,
-.service-card-image-container {
+.service-card-image-container,
+.service-card .service-icon {
   width: 100%;
-  height: 180px;
+  height: 160px;
   overflow: hidden;
   border-radius: var(--radius-sm, 6px);
-  margin-bottom: 12px;
+  margin-bottom: 15px;
   background: #121212;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.product-image img,
 .product-card-image-container img,
-.service-card-image-container img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.service-card-image-container img,
+.service-card .service-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .product-card-info,
-.service-card-info {
+.service-card-info,
+.service-info-content {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
-/* ==========================================================
-   STRICT ACTION BUTTON FIX (Equal 50/50 Split Side-by-Side)
-   ================================================---------- */
+.product-name,
+.service-card .service-name {
+  font-size: 1rem;
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.product-description,
+.service-card .service-desc {
+  font-size: 0.85rem;
+  color: #9aa0a6;
+  margin-bottom: 15px;
+  line-height: 1.4;
+}
+
+.product-price {
+  color: var(--color-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.service-action-wrapper {
+  margin-top: auto;
+  width: 100%;
+}
+
+/* Action Buttons (Equal 50/50 Split Side-by-Side) */
 .product-card-actions {
   display: flex !important;
   gap: 10px !important;
-  margin-top: 15px !important;
+  margin-top: auto !important;
   width: 100% !important;
   align-items: center !important;
 }
 
-/* Cart Button: Outline Only (White -> Cyan on Hover) */
+/* Cart Button: Outline Only */
 .product-card-actions .btn-cart-add,
 .product-card-actions a.btn-cart-add,
 .product-card-actions button.btn-cart-add {
@@ -232,7 +279,6 @@
   transition: color 0.2s ease !important;
 }
 
-/* Hover: Pure Outline & Icon Cyan (Transparent Background) */
 .product-card-actions .btn-cart-add:hover,
 .product-card-actions a.btn-cart-add:hover,
 .product-card-actions button.btn-cart-add:hover {
@@ -247,9 +293,10 @@
   color: #00b4d8 !important;
 }
 
-/* Book / Buy Now Button: Dark Blue Pill taking 50% width */
+/* Book / Buy Now Button */
 .product-card-actions .btn-book-appointment,
-.product-card-actions .btn-buy-now {
+.product-card-actions .btn-buy-now,
+.service-action-wrapper .btn {
   background: #08234e !important;
   color: #f3f4e4 !important;
   border: 1px solid #08234e !important;
@@ -267,11 +314,12 @@
   cursor: pointer !important;
   padding: 0 16px !important;
   transition: all 0.2s ease !important;
+  width: 100%;
 }
 
-/* Cyan highlight applied strictly on hover */
 .product-card-actions .btn-book-appointment:hover,
-.product-card-actions .btn-buy-now:hover {
+.product-card-actions .btn-buy-now:hover,
+.service-action-wrapper .btn:hover {
   background: #00b4d8 !important;
   color: #121212 !important;
   border-color: #00b4d8 !important;
@@ -325,6 +373,7 @@
   border: 1px solid var(--color-primary, #00d2d3);
   color: var(--color-text, #fff);
   border-radius: var(--radius-sm, 6px);
+  outline: none;
 }
 
 .auth-input.half-width {
@@ -350,6 +399,7 @@
   border-radius: var(--radius-sm, 6px);
   resize: vertical;
   min-height: 60px;
+  outline: none;
 }
 
 .form-group-mb {
@@ -445,7 +495,7 @@ main .auth-submit-btn:hover,
   color: var(--color-text-muted, #aaa);
 }
 
-/* ==================== SERVICE BOOKING MODAL STYLES ==================== */
+/* Service Booking Modal Styles */
 #service-booking-modal .auth-modal-content {
   background: var(--color-bg-alt, #1e272e);
   color: var(--color-text, #fff);

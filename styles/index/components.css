@@ -125,7 +125,10 @@
 .header-cta-group {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 

@@ -4,21 +4,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
+require_once 'includes/config.php';
+
+$userId = $_SESSION['user_id'] ?? null;
+
+$userData = [];
+if ($userId) {
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $userData = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 }
 
-require_once 'config.php';
+$userName = trim(
+    ($userData['first_name'] ?? '') . ' ' .
+    ($userData['last_name'] ?? '')
+);
 
-$userId = $_SESSION['user_id'];
+if ($userName === '') {
+    $userName = $userData['username'] ?? '';
+}
 
-$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$userId]);
-$userData = $stmt->fetch(PDO::FETCH_ASSOC);
-
-$userName = $userData['name'] ?? $userData['fullname'] ?? $userData['first_name'] ?? $userData['username'] ?? 'Carl Stephen E. Bencalo';
-$userPhone = $userData['phone'] ?? $userData['contact_number'] ?? '09123456789';
+$userPhone = $userData['phone'] ?? $userData['contact_number'] ?? '';
 
 $promos = [
     [
@@ -49,8 +55,8 @@ $promos = [
         'title' => 'Synthetic Oil Change + Tune-Up',
         'badge' => '20% OFF',
         'badge_class' => 'badge-pending',
-        'product_image' => 'images/featured_products/oil.webp',
-        'service_image' => 'images/featured_services/tuneup.png',
+        'product_image' => 'images/featured_products/synthetic_oil.png  ',
+        'service_image' => 'images/featured_services/premium_oil_and_change_service.png',
         'product_icon' => 'fa-solid fa-oil-can',
         'service_icon' => 'fa-solid fa-gauge-high',
         'description' => 'Keep your engine running smoothly with high-grade synthetic oil paired with a complete carb/FI diagnostic tune-up service.',
@@ -71,8 +77,8 @@ $promos = [
         'title' => 'Heavy Duty Chain Kit + Install',
         'badge' => '10% OFF',
         'badge_class' => 'badge-completed',
-        'product_image' => 'images/featured_products/chain.webp',
-        'service_image' => 'images/featured_services/install.png',
+        'product_image' => 'images/products/chain.png',
+        'service_image' => 'images/services/chain.png',
         'product_icon' => 'fa-solid fa-link',
         'service_icon' => 'fa-solid fa-gear',
         'description' => 'Upgrade your drive train with a heavy-duty chain and sprocket set bundled together with precision professional installation.',
@@ -93,8 +99,8 @@ $promos = [
         'title' => 'Brake Pad Set + Fluid Bleeding',
         'badge' => '15% OFF',
         'badge_class' => 'badge-pending',
-        'product_image' => 'images/featured_products/brakepad.webp',
-        'service_image' => 'images/featured_services/brakefluid.png',
+        'product_image' => 'images/products/brake.png',
+        'service_image' => 'images/services/brake.png',
         'product_icon' => 'fa-solid fa-compact-disc',
         'service_icon' => 'fa-solid fa-droplet',
         'description' => 'Ensure maximum stopping power by bundling front/rear ceramic brake pads with a complete hydraulic fluid flush and bleed service.',
@@ -109,50 +115,6 @@ $promos = [
             'Complete DOT-4 brake fluid replacement'
         ]
     ],
-    [
-        'id' => 5,
-        'slug' => 'battery_electrical',
-        'title' => 'Maintenance-Free Battery + Check',
-        'badge' => '12% OFF',
-        'badge_class' => 'badge-pending',
-        'product_image' => 'images/featured_products/battery.webp',
-        'service_image' => 'images/featured_services/electrical.png',
-        'product_icon' => 'fa-solid fa-car-battery',
-        'service_icon' => 'fa-solid fa-bolt',
-        'description' => 'Never get stranded with a dead battery. Purchase a reliable maintenance-free battery paired with a full electrical charging system scan.',
-        'item_label' => 'Select Battery Model',
-        'item_options' => [
-            'Motolite Maintenance-Free YTZ7S',
-            'Yuasa YTZ5S-BS High Performance AGM Battery',
-            'Varta Powersports AGM Battery (YT7B-BS)'
-        ],
-        'perks' => [
-            '1-Year replacement warranty on battery',
-            'Complete stator and regulator output test'
-        ]
-    ],
-    [
-        'id' => 6,
-        'slug' => 'full_detailing',
-        'title' => 'Premium Wash + Ceramic Coating',
-        'badge' => '25% OFF',
-        'badge_class' => 'badge-completed',
-        'product_image' => 'images/featured_products/shampoo.webp',
-        'service_image' => 'images/featured_services/detailing.png',
-        'product_icon' => 'fa-solid fa-spray-can-sparkles',
-        'service_icon' => 'fa-solid fa-wand-magic-sparkles',
-        'description' => 'Bring back showroom shine! Combine an elite pressure foam wash with a semi-permanent ceramic paint protection coating session.',
-        'item_label' => 'Select Detailing Package',
-        'item_options' => [
-            'Full Body Gloss Ceramic Coating (9H Protection)',
-            'Matte Finish Ceramic Shield & Steam Clean Wash',
-            'Engine Bay Degreasing + Nano Ceramic Wax Coat'
-        ],
-        'perks' => [
-            'Safe multi-stage scratchless wash',
-            'Long-lasting UV and water repellent coat'
-        ]
-    ]
 ];
 ?>
 <!DOCTYPE html>
@@ -164,7 +126,7 @@ $promos = [
     <link rel="stylesheet" href="styles/index/components.css">
     <link rel="stylesheet" href="styles/index/layout.css">
     <link rel="stylesheet" href="styles/promos.css">
-    <link rel="stylesheet" href="styles/modals.css">
+    <link rel="stylesheet" href="styles/index/modals.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .alert-toast {
@@ -246,7 +208,7 @@ $promos = [
 
                 <div style="margin-bottom: 15px;">
                     <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Contact Phone</label>
-                    <input type="text" name="phone" value="<?= htmlspecialchars($userPhone) ?>" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                    <input type="tel" name="phone" value="<?= htmlspecialchars($userPhone, ENT_QUOTES, 'UTF-8') ?>" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
                 </div>
 
                 <div style="margin-bottom: 15px;">
@@ -256,7 +218,7 @@ $promos = [
 
                 <div style="margin-bottom: 15px;">
                     <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Appointment Date</label>
-                    <input type="date" name="appointment_date" required min="<?= date('Y-m-d') ?>" style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                    <input type="date" name="appointment_date" required min="<?= date('Y-m-d') ?>" style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; color-scheme:dark; border-radius:4px;">
                 </div>
 
                 <div style="margin-bottom: 20px;">

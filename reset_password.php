@@ -1,9 +1,5 @@
 <?php
-// Enable error reporting for debugging
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
-require_once 'config.php';
+require_once 'includes/config.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -69,7 +65,10 @@ if (!empty($token)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Password - Bencalo MotoWorks</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles/style.css">
+    <link rel="stylesheet" href="styles/index/style.css">
+    <link rel="stylesheet" href="styles/index/components.css">
+    <link rel="stylesheet" href="styles/index/layout.css">
+    <link rel="stylesheet" href="styles/index/modals.css">
 </head>
 <body style="display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--color-bg);">
     <div style="background: var(--color-bg-alt); padding: 30px; border-radius: var(--radius-md); width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 1px solid var(--color-border);">

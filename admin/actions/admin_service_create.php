@@ -20,10 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $price = filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT);
+    $active = ($_POST['status'] ?? 'Active') === 'Inactive' ? 0 : 1;
 
     if (!empty($name) && $price !== false && $price >= 0) {
-        $stmt = $pdo->prepare("INSERT INTO services (name, description, price) VALUES (?, ?, ?)");
-        $stmt->execute([$name, $description, $price]);
+        $stmt = $pdo->prepare("INSERT INTO services (name, description, price, active) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$name, $description, $price, $active]);
 
         header('Location: ../admin_services.php?msg=Service+successfully+created');
         exit();

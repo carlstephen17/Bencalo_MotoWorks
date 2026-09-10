@@ -49,9 +49,8 @@ $base_path = '';
             <p>Bencalo MotoWorks is not responsible for personal items left inside vehicles or preexisting mechanical failures unrelated to performed services.</p>
         </div>
     </main>
-    <?php 
-    require_once 'components/footer.php'; 
-    require_once 'components/modals.php'; 
+    <?php require_once 'components/footer.php'; ?>
+    <?php require_once 'components/modals.php'; ?>
     ?>
 </body>
 </html>

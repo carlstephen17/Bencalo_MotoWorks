@@ -136,7 +136,7 @@ $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div>
                         <label style="display: block; font-weight: 600; color: #555; font-size: 0.85rem; margin-bottom: 3px;">Phone Number:</label>
-                        <input type="text" name="phone" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                        <input type="tel" name="phone" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11" title="Enter an 11-digit Philippine mobile number starting with 09" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                     </div>
                     <div>
                         <label style="display: block; font-weight: 600; color: #555; font-size: 0.85rem; margin-bottom: 3px;">Bundle Slug / Name:</label>

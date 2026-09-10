@@ -24,7 +24,7 @@
             <div class="footer-col">
                 <h4>Customer Support</h4>
                 <ul>
-                    <li><a href="../profile.php">My Account</a></li>
+                    <li><a href="profile.php">My Account</a></li>
                     <li><a href="faq.php">FAQ</a></li>
                     <li><a href="terms.php">Terms & Conditions</a></li>
                 </ul>

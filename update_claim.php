@@ -1,5 +1,6 @@
 <?php
-// update_claim.php - Backend handler to execute updates on promo appointments
+// update_claim.php
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -16,42 +17,55 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-require_once 'config.php';
-
-$userId = $_SESSION['user_id'];
-$isAdmin = $_SESSION['is_admin'] ?? false;
-
-$claimId = intval($_POST['claim_id'] ?? 0);
-$fullname = trim($_POST['fullname'] ?? '');
-$phone = trim($_POST['phone'] ?? '');
-$appointmentDate = trim($_POST['appointment_date'] ?? '');
-$appointmentTime = trim($_POST['appointment_time'] ?? '');
-
-// Validation
-if ($claimId <= 0 || empty($fullname) || empty($phone) || empty($appointmentDate) || empty($appointmentTime)) {
-    echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
+// Validate CSRF Token if sent
+if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    echo json_encode(['success' => false, 'message' => 'Invalid security token. Please refresh and try again.']);
     exit;
 }
 
-// Validate date is not in the past
-if (strtotime($appointmentDate) < strtotime(date('Y-m-d'))) {
-    echo json_encode(['success' => false, 'message' => 'Appointment date cannot be set in the past.']);
+require_once 'includes/config.php';
+
+$userId = intval($_SESSION['user_id']);
+$isAdmin = $_SESSION['is_admin'] ?? false;
+
+$claimId = isset($_POST['claim_id']) ? intval($_POST['claim_id']) : 0;
+$fullname = isset($_POST['fullname']) ? trim($_POST['fullname']) : '';
+$phone = isset($_POST['phone']) ? trim($_POST['phone']) : '';
+$appointment_date = isset($_POST['appointment_date']) ? trim($_POST['appointment_date']) : '';
+$appointment_time = isset($_POST['appointment_time']) ? trim($_POST['appointment_time']) : '';
+$status = isset($_POST['status']) ? trim($_POST['status']) : 'Pending';
+
+if ($claimId <= 0 || empty($fullname) || empty($phone) || empty($appointment_date) || empty($appointment_time)) {
+    echo json_encode(['success' => false, 'message' => 'Please fill in all required fields.']);
     exit;
 }
 
 try {
     if ($isAdmin) {
-        $stmt = $pdo->prepare("UPDATE promo_claims SET fullname = ?, phone = ?, appointment_date = ?, appointment_time = ? WHERE id = ?");
-        $stmt->execute([$fullname, $phone, $appointmentDate, $appointmentTime, $claimId]);
+        // Admins can update any claim, including status
+        $stmt = $pdo->prepare("
+            UPDATE promo_claims 
+            SET fullname = ?, phone = ?, appointment_date = ?, appointment_time = ?, status = ?
+            WHERE id = ?
+        ");
+        $stmt->execute([$fullname, $phone, $appointment_date, $appointment_time, $status, $claimId]);
     } else {
-        $stmt = $pdo->prepare("UPDATE promo_claims SET fullname = ?, phone = ?, appointment_date = ?, appointment_time = ? WHERE id = ? AND user_id = ?");
-        $stmt->execute([$fullname, $phone, $appointmentDate, $appointmentTime, $claimId, $userId]);
+        // Regular users can only update their own claims and cannot change status to Completed/etc. arbitrarily unless restricted
+        $stmt = $pdo->prepare("
+            UPDATE promo_claims 
+            SET fullname = ?, phone = ?, appointment_date = ?, appointment_time = ?
+            WHERE id = ? AND users_id = ?
+        ");
+        $stmt->execute([$fullname, $phone, $appointment_date, $appointment_time, $claimId, $userId]);
     }
 
-    echo json_encode([
-        'success' => true, 
-        'message' => 'Appointment details updated successfully!'
-    ]);
-} catch (Exception $e) {
+    if ($stmt->rowCount() > 0 || $pdo->query("SELECT id FROM promo_claims WHERE id = $claimId")->fetch()) {
+        echo json_encode(['success' => true, 'message' => 'Appointment updated successfully!']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Claim not found or you do not have permission to edit it.']);
+    }
+
+} catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
+?>

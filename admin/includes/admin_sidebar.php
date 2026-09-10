@@ -4,7 +4,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <aside class="admin-sidebar">
     <div class="sidebar-brand">
-        <h2>MotoWorks Admin</h2>
+        <a href="/MotoWorks/index.php">
+            <h2>MotoWorks Admin</h2>
+        </a>
     </div>
     <ul class="sidebar-menu">
         <li class="<?= ($current_page === 'admin_index.php' || $current_page === 'admin_dashboard.php') ? 'active' : '' ?>">

@@ -80,11 +80,14 @@ body {
 
 /* Explicit column widths matching appointments proportions */
 .styled-table th:nth-child(1), .styled-table td:nth-child(1) { width: 10%; } /* Order ID */
-.styled-table th:nth-child(2), .styled-table td:nth-child(2) { width: 28%; } /* Product */
-.styled-table th:nth-child(3), .styled-table td:nth-child(3) { width: 13%; } /* Total Amount */
-.styled-table th:nth-child(4), .styled-table td:nth-child(4) { width: 12%; } /* Status */
-.styled-table th:nth-child(5), .styled-table td:nth-child(5) { width: 17%; } /* Date Placed */
-.styled-table th:nth-child(6), .styled-table td:nth-child(6) { width: 20%; } /* Actions */
+.styled-table th:nth-child(2), .styled-table td:nth-child(2) { width: 20%; } /* Product */
+.styled-table th:nth-child(3), .styled-table td:nth-child(3) { width: 10%; } /* Quantiy */
+.styled-table th:nth-child(4), .styled-table td:nth-child(4) { width: 10%; } /* Price */
+.styled-table th:nth-child(5), .styled-table td:nth-child(5) { width: 13%; } /* Total Amount */
+.styled-table th:nth-child(6), .styled-table td:nth-child(6) { width: 12%; } /* Status */
+.styled-table th:nth-child(7), .styled-table td:nth-child(7) { width: 17%; } /* Date Placed */
+.styled-table th:nth-child(8), .styled-table td:nth-child(8) { width: 20%; } /* Actions */
+
 
 .styled-table th {
   color: var(--color-border, #00d2d3);

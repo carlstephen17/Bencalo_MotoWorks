@@ -21,10 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $price = filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT);
+    $active = ($_POST['status'] ?? 'Active') === 'Inactive' ? 0 : 1;
 
     if ($id && !empty($name) && $price !== false && $price >= 0) {
-        $stmt = $pdo->prepare("UPDATE services SET name = ?, description = ?, price = ? WHERE id = ?");
-        $stmt->execute([$name, $description, $price, $id]);
+        $stmt = $pdo->prepare("UPDATE services SET name = ?, description = ?, price = ?, active = ? WHERE id = ?");
+        $stmt->execute([$name, $description, $price, $active, $id]);
 
         header('Location: ../admin_services.php?msg=Service+successfully+updated');
         exit();

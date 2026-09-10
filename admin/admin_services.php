@@ -15,7 +15,7 @@ $search = trim($_GET['search'] ?? '');
 $status_filter = $_GET['status'] ?? '';
 
 // Build query with search and status filters
-$query = "SELECT * FROM services WHERE 1=1";
+$query = "SELECT services.*, CASE WHEN active = 1 THEN 'Active' ELSE 'Inactive' END AS status FROM services WHERE 1=1";
 $params = [];
 
 if (!empty($search)) {
@@ -27,8 +27,8 @@ if (!empty($search)) {
 }
 
 if (!empty($status_filter) && $status_filter !== 'all') {
-    $query .= " AND status = ?";
-    $params[] = $status_filter;
+    $query .= " AND active = ?";
+    $params[] = $status_filter === 'Active' ? 1 : 0;
 }
 
 $query .= " ORDER BY id ASC";

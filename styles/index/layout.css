@@ -16,8 +16,8 @@
 .header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  justify-content: flex-start;
+  gap: 28px;
   width: 100%;
   padding-top: 0;
   padding-bottom: 0;
@@ -42,15 +42,14 @@
 }
 
 .main-nav {
-  position: absolute;
-  left: 40%;
-  transform: translateX(-35%);
+  position: static;
+  transform: none;
   margin: 0;
 }
 
 .main-nav ul {
   display: flex;
-  gap: 100px;
+  gap: 50px;
 }
 
 .main-nav a {

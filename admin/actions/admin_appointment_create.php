@@ -1,6 +1,6 @@
 <?php
-// /admin/actions/admin_appointment_create.php
 session_start();
+
 require_once '../../includes/config.php';
 /** @var PDO $pdo */
 require_once '../../includes/auth.php';
@@ -10,31 +10,85 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['csrf_token'] ?? '';
-    if (!verifyCSRFToken($token)) {
-        header('Location: ../admin_promo_history.php?msg=Invalid+Security+Token');
-        exit();
-    }
-
-    $fullname = trim($_POST['fullname'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $bundle_slug = trim($_POST['bundle_slug'] ?? '');
-    $appointment_date = trim($_POST['appointment_date'] ?? '');
-    $appointment_time = trim($_POST['appointment_time'] ?? '');
-    $status = trim($_POST['status'] ?? 'Pending');
-
-    if (!empty($fullname) && !empty($appointment_date) && !empty($appointment_time)) {
-        $stmt = $pdo->prepare("INSERT INTO promo_claims (fullname, phone, bundle_slug, appointment_date, appointment_time, status) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$fullname, $phone, $bundle_slug, $appointment_date, $appointment_time, $status]);
-
-        header('Location: ../admin_promo_history.php?msg=Appointment+successfully+created');
-        exit();
-    }
-
-    header('Location: ../admin_promo_history.php?msg=Invalid+appointment+parameters');
-    exit();
-} else {
-    header('Location: ../admin_promo_history.php');
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../admin_appointment.php');
     exit();
 }
+
+$token = $_POST['csrf_token'] ?? '';
+
+if (!verifyCSRFToken($token)) {
+    header('Location: ../admin_appointment.php?msg=Invalid+Security+Token');
+    exit();
+}
+
+$full_name = trim($_POST['full_name'] ?? '');
+$contact_number = trim($_POST['contact_number'] ?? '');
+$vehicle_model = trim($_POST['vehicle_model'] ?? '');
+$user_id = filter_input(INPUT_POST, 'users_id', FILTER_VALIDATE_INT);
+$services_id = filter_input(INPUT_POST, 'services_id', FILTER_VALIDATE_INT);
+$booking_date = trim($_POST['booking_date'] ?? '');
+$booking_time = trim($_POST['booking_time'] ?? '');
+$status = trim($_POST['status'] ?? 'Pending');
+$notes = trim($_POST['notes'] ?? '');
+
+$allowed_statuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
+
+if (
+    empty($full_name) ||
+    !$user_id ||
+    !$services_id ||
+    !preg_match('/^09[0-9]{9}$/', $contact_number) ||
+    empty($booking_date) ||
+    empty($booking_time)
+) {
+    header('Location: ../admin_appointment.php?msg=Please+fill+in+all+required+fields');
+    exit();
+}
+
+if (!in_array($status, $allowed_statuses)) {
+    $status = 'Pending';
+}
+
+try {
+
+    $stmt = $pdo->prepare("
+        INSERT INTO service_bookings
+        (
+            user_id,
+            full_name,
+            contact_number,
+            vehicle_model,
+            services_id,
+            booking_date,
+            booking_time,
+            status,
+            notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    $stmt->execute([
+        $user_id,
+        $full_name,
+        $contact_number,
+        $vehicle_model,
+        $services_id,
+        $booking_date,
+        $booking_time,
+        $status,
+        $notes
+    ]);
+
+    header('Location: ../admin_appointment.php?msg=Appointment+successfully+created');
+    exit();
+
+} catch (PDOException $e) {
+
+    header(
+        'Location: ../admin_appointment.php?msg=' .
+        urlencode('Failed to create appointment: ' . $e->getMessage())
+    );
+    exit();
+}
+?>

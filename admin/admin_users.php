@@ -290,7 +290,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 <div class="form-group">
                     <label>Phone Number</label>
-                    <input type="text" name="phone" id="edit-phone" class="form-control">
+                    <input type="tel" name="phone" id="edit-phone" class="form-control" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11" title="Enter an 11-digit Philippine mobile number starting with 09">
                 </div>
                 <div class="form-group">
                     <label>Role</label>

@@ -247,8 +247,6 @@ foreach ($db_testimonials as $index => $db_t) {
     <?php require_once 'components/modals.php'; ?>
 
     <script>
-        const isLoggedIn = <?= isset($_SESSION['user_id']) ? 'true' : 'false' ?>;
-
         function openModal(modalId) {
             document.getElementById(modalId).classList.add('active');
         }
@@ -316,6 +314,12 @@ foreach ($db_testimonials as $index => $db_t) {
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('admin_login') === '1') {
+                openModal('login-modal');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
             const currentPath = window.location.pathname.split("/").pop();
             const navLinks = document.querySelectorAll(".main-nav a, .header-nav-link");
             navLinks.forEach(link => {

@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $appointment_time = trim($_POST['appointment_time'] ?? '');
     $status = trim($_POST['status'] ?? 'Active');
 
-    if (!empty($fullname) && !empty($phone) && !empty($bundle_slug) && !empty($appointment_date)) {
+    if (!empty($fullname) && preg_match('/^09[0-9]{9}$/', $phone) && !empty($bundle_slug) && !empty($appointment_date)) {
         $stmt = $pdo->prepare("INSERT INTO promo_claims (fullname, phone, bundle_slug, selected_option, appointment_date, appointment_time, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
         if ($stmt->execute([$fullname, $phone, $bundle_slug, $selected_option, $appointment_date, $appointment_time, $status])) {
             header('Location: ../admin_promos.php?msg=Promo+claim+added+successfully');

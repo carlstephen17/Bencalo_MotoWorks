@@ -20,11 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
     $name = trim($_POST['name'] ?? '');
     $price = filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT);
+    $stock = filter_input(INPUT_POST, 'stock', FILTER_VALIDATE_INT);
 
-    if ($id && !empty($name) && $price !== false && $price >= 0) {
+    if ($id && !empty($name) && $price !== false && $price >= 0 && $stock !== false && $stock >= 0) {
         // Check if a new image was uploaded
         $imageClause = "";
-        $params = [$name, $price];
+        $params = [$name, $price, $stock];
 
         if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
             $fileTmpPath = $_FILES['image']['tmp_name'];
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $params[] = $id;
-        $stmt = $pdo->prepare("UPDATE products SET name = ?, price = ?{$imageClause} WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE products SET name = ?, price = ?, stock = ?{$imageClause} WHERE id = ?");
         $stmt->execute($params);
 
         header('Location: ../admin_products.php?msg=Product+successfully+updated');

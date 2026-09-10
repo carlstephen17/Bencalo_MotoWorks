@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim($_POST['phone'] ?? '');
     $role = trim($_POST['role'] ?? 'customer');
 
-    if ($userId <= 0) {
+    if ($userId <= 0 || !preg_match('/^09[0-9]{9}$/', $phone)) {
         header('Location: ../admin_users.php?msg=' . urlencode('Invalid user ID.'));
         exit();
     }

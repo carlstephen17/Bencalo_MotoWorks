@@ -79,11 +79,11 @@ body {
 
 /* Define explicit column widths to prevent excessive spreading */
 .appointment-table th:nth-child(1), .appointment-table td:nth-child(1) { width: 23%; } /* Service */
-.appointment-table th:nth-child(2), .appointment-table td:nth-child(2) { width: 12%; } /* Vehicle */
-.appointment-table th:nth-child(3), .appointment-table td:nth-child(3) { width: 15%; } /* Date & Time */
-.appointment-table th:nth-child(4), .appointment-table td:nth-child(4) { width: 12%; } /* Contact */
-.appointment-table th:nth-child(5), .appointment-table td:nth-child(5) { width: 10%; } /* Price */
-.appointment-table th:nth-child(6), .appointment-table td:nth-child(6) { width: 12%; } /* Status */
+.appointment-table th:nth-child(2), .appointment-table td:nth-child(2) { width: 20%; } /* Vehicle */
+.appointment-table th:nth-child(3), .appointment-table td:nth-child(3) { width: 12%; } /* Date & Time */
+.appointment-table th:nth-child(4), .appointment-table td:nth-child(4) { width: 15%; } /* Contact */
+.appointment-table th:nth-child(5), .appointment-table td:nth-child(5) { width: 12%; } /* Price */
+.appointment-table th:nth-child(6), .appointment-table td:nth-child(6) { width: 10%; } /* Status */
 .appointment-table th:nth-child(7), .appointment-table td:nth-child(7) { width: 15%; } /* Actions */
 
 .appointment-table th {

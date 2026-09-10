@@ -1,12 +1,9 @@
--- bencalo_motoworks.sql
--- Database backup structure and default admin
+-- MotoWorks database schema.
+-- Select the database named by DB_NAME before importing this file.
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
-
-CREATE DATABASE IF NOT EXISTS `bencalo_motoworks` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE `bencalo_motoworks`;
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
@@ -23,9 +20,5 @@ CREATE TABLE `users` (
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- Default admin seeding (Username: admin | Password: AdminSecure123!)
-INSERT INTO `users` (`id`, `username`, `first_name`, `last_name`, `email`, `phone`, `password`, `role`, `created_at`) VALUES
-(1, 'admin', 'System', 'Administrator', 'admin@bencalomotoworks.com', '09123456789', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', NOW());
 
 COMMIT;
