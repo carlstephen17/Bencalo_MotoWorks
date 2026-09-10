@@ -93,6 +93,33 @@ if (isset($_SESSION['user_id'])) {
         display: flex !important;
     }
 
+    .confirmation-detail-list {
+        display: grid;
+        gap: 8px;
+        margin: 18px 0;
+        text-align: left;
+    }
+
+    .confirmation-detail-list div {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(203, 213, 225, 0.16);
+    }
+
+    .confirmation-detail-list span {
+        color: #99f6e4;
+        font-size: 0.8rem;
+    }
+
+    .confirmation-detail-list strong {
+        max-width: 68%;
+        color: #f8fafc;
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
 </style>
 
 
@@ -442,6 +469,40 @@ if (isset($_SESSION['user_id'])) {
             </button>
 
         </form>
+
+        <div
+            id="order-confirmation-panel"
+            style="display: none; text-align: center; padding: 12px 4px 4px;"
+        >
+            <div style="font-size: 3rem; color: #2ed573;">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h3 style="margin: 12px 0 8px;">Order Confirmed</h3>
+            <p style="color: var(--color-text-muted, #aaa); margin-bottom: 18px;">
+                Your order was recorded. Keep this reference number for your receipt.
+            </p>
+            <div class="confirmation-detail-list">
+                <div><span>Customer</span><strong id="order-confirmation-customer"></strong></div>
+                <div><span>Order</span><strong id="order-confirmation-item"></strong></div>
+                <div><span>Phone</span><strong id="order-confirmation-phone"></strong></div>
+                <div><span>Address</span><strong id="order-confirmation-address"></strong></div>
+                <div><span>Payment method</span><strong id="order-confirmation-payment"></strong></div>
+            </div>
+            <div style="padding: 14px; border: 1px dashed #2ed573; border-radius: 6px; background: rgba(46, 213, 115, 0.08);">
+                <span style="display: block; color: #9ae6b4; font-size: 12px; text-transform: uppercase;">
+                    Order Reference
+                </span>
+                <strong id="order-confirmation-reference" style="display: block; margin-top: 5px; font-size: 1.15rem; letter-spacing: 1px;"></strong>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                <a href="order_history.php" class="btn btn-primary" style="text-decoration: none;">
+                    <i class="fa-solid fa-receipt"></i> View order history
+                </a>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('buy-modal')">
+                    Done
+                </button>
+            </div>
+        </div>
 
     </div>
 
@@ -865,6 +926,45 @@ if (isset($_SESSION['user_id'])) {
 
 
         </form>
+
+        <div
+            id="booking-confirmation-panel"
+            style="
+                display: none;
+                text-align: center;
+                padding: 12px 4px 4px;
+            "
+        >
+            <div style="font-size: 3rem; color: #2ed573;">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h3 style="margin: 12px 0 8px;">Booking Confirmed</h3>
+            <p style="color: var(--text-muted, #aaa); margin-bottom: 18px;">
+                Your booking has been recorded. Keep this reference number for your appointment.
+            </p>
+            <div class="confirmation-detail-list">
+                <div><span>Customer</span><strong id="booking-confirmation-customer"></strong></div>
+                <div><span>Service</span><strong id="booking-confirmation-service"></strong></div>
+                <div><span>Vehicle</span><strong id="booking-confirmation-vehicle"></strong></div>
+                <div><span>Date & time</span><strong id="booking-confirmation-schedule"></strong></div>
+                <div><span>Phone</span><strong id="booking-confirmation-phone"></strong></div>
+                <div><span>Notes</span><strong id="booking-confirmation-notes"></strong></div>
+            </div>
+            <div style="padding: 14px; border: 1px dashed #2ed573; border-radius: 6px; background: rgba(46, 213, 115, 0.08);">
+                <span style="display: block; color: #9ae6b4; font-size: 12px; text-transform: uppercase;">
+                    Booking Reference
+                </span>
+                <strong id="booking-confirmation-reference" style="display: block; margin-top: 5px; font-size: 1.15rem; letter-spacing: 1px;"></strong>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+                <a href="appointment_history.php" class="btn btn-primary" style="text-decoration: none;">
+                    <i class="fa-solid fa-calendar-check"></i> View bookings
+                </a>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('service-booking-modal')">
+                    Done
+                </button>
+            </div>
+        </div>
 
     </div>
 
@@ -1956,10 +2056,27 @@ if (isset($_SESSION['user_id'])) {
             );
 
 
+        const orderConfirmation = document.getElementById(
+            'order-confirmation-panel'
+        );
+
+        const buyProductSummary = document.getElementById(
+            'buy-modal-product-summary'
+        );
+
         if (buyForm) {
 
+            buyForm.style.display = '';
             buyForm.dataset.submitting =
                 'false';
+        }
+
+        if (orderConfirmation) {
+            orderConfirmation.style.display = 'none';
+        }
+
+        if (buyProductSummary) {
+            buyProductSummary.style.display = '';
         }
 
 
@@ -2355,6 +2472,46 @@ if (isset($_SESSION['user_id'])) {
                 serviceName;
         }
 
+        const bookingForm = document.getElementById(
+            'ajax-service-booking-form'
+        );
+
+        const bookingConfirmation = document.getElementById(
+            'booking-confirmation-panel'
+        );
+
+        const bookingAlert = document.getElementById(
+            'service-booking-modal-alert'
+        );
+
+        if (bookingForm) {
+            bookingForm.style.display = '';
+            bookingForm.dataset.submitting = 'false';
+
+            const vehicleInput = document.getElementById('booking-vehicle');
+            const dateInput = document.getElementById('booking-date');
+            const timeInput = document.getElementById('booking-time');
+            const notesInput = document.getElementById('booking-notes');
+
+            if (vehicleInput) vehicleInput.value = '';
+            if (dateInput) dateInput.value = '';
+            if (timeInput) timeInput.selectedIndex = 0;
+            if (notesInput) notesInput.value = '';
+
+            if (serviceIdInput) {
+                serviceIdInput.value = serviceId;
+            }
+        }
+
+        if (bookingConfirmation) {
+            bookingConfirmation.style.display = 'none';
+        }
+
+        if (bookingAlert) {
+            bookingAlert.style.display = 'none';
+            bookingAlert.textContent = '';
+        }
+
 
         openModal(
             'service-booking-modal'
@@ -2712,6 +2869,66 @@ if (isset($_SESSION['user_id'])) {
                                     return;
                                 }
 
+                                if (
+                                    formId ===
+                                    'ajax-service-booking-form'
+                                ) {
+                                    const confirmationPanel =
+                                        document.getElementById(
+                                            'booking-confirmation-panel'
+                                        );
+
+                                    const confirmationReference =
+                                        document.getElementById(
+                                            'booking-confirmation-reference'
+                                        );
+
+                                    const bookingAlert =
+                                        document.getElementById(
+                                            modalId + '-alert'
+                                        );
+
+                                    if (confirmationReference) {
+                                        confirmationReference.textContent =
+                                            data.booking_reference || 'Pending';
+                                    }
+
+                                    document.getElementById(
+                                        'booking-confirmation-customer'
+                                    ).textContent = data.customer_name || '';
+                                    document.getElementById(
+                                        'booking-confirmation-service'
+                                    ).textContent = data.service_name || '';
+                                    document.getElementById(
+                                        'booking-confirmation-vehicle'
+                                    ).textContent = data.vehicle || '';
+                                    document.getElementById(
+                                        'booking-confirmation-schedule'
+                                    ).textContent =
+                                        (data.booking_date || '') +
+                                        ' / ' +
+                                        (data.booking_time || '');
+                                    document.getElementById(
+                                        'booking-confirmation-phone'
+                                    ).textContent = data.phone || '';
+                                    document.getElementById(
+                                        'booking-confirmation-notes'
+                                    ).textContent = data.notes || 'None';
+
+                                    if (bookingAlert) {
+                                        bookingAlert.style.display = 'none';
+                                    }
+
+                                    form.style.display = 'none';
+
+                                    if (confirmationPanel) {
+                                        confirmationPanel.style.display = 'block';
+                                    }
+
+                                    form.dataset.submitting = 'false';
+                                    return;
+                                }
+
 
                                 // =================================
                                 // LOGIN SUCCESS
@@ -2818,6 +3035,75 @@ if (isset($_SESSION['user_id'])) {
                                     'ajax-buy-form'
                                 ) {
 
+                                    const paymentReference =
+                                        data.payment_reference;
+
+                                    const paymentMethod =
+                                        data.payment_method;
+
+                                    const orderConfirmation =
+                                        document.getElementById(
+                                            'order-confirmation-panel'
+                                        );
+                                    const orderConfirmationReference =
+                                        document.getElementById(
+                                            'order-confirmation-reference'
+                                        );
+                                    const buyProductSummary =
+                                        document.getElementById(
+                                            'buy-modal-product-summary'
+                                        );
+                                    const buyAlert =
+                                        document.getElementById(
+                                            modalId + '-alert'
+                                        );
+
+                                    if (orderConfirmationReference) {
+                                        orderConfirmationReference.textContent =
+                                            paymentReference || 'Pending';
+                                    }
+
+                                    const orderItems =
+                                        (data.items || [])
+                                            .map(item =>
+                                                item.name +
+                                                ' (x' +
+                                                item.quantity +
+                                                ')'
+                                            )
+                                            .join(', ');
+
+                                    document.getElementById(
+                                        'order-confirmation-customer'
+                                    ).textContent = data.customer_name || '';
+                                    document.getElementById(
+                                        'order-confirmation-item'
+                                    ).textContent = orderItems;
+                                    document.getElementById(
+                                        'order-confirmation-phone'
+                                    ).textContent = data.phone || '';
+                                    document.getElementById(
+                                        'order-confirmation-address'
+                                    ).textContent = data.address || '';
+                                    document.getElementById(
+                                        'order-confirmation-payment'
+                                    ).textContent = paymentMethod || '';
+
+                                    if (
+                                        paymentReference &&
+                                        paymentMethod
+                                    ) {
+                                        showModalAlert(
+                                            modalId,
+                                            'Order placed successfully! Reference number: ' +
+                                            paymentReference +
+                                            '. Payment method: ' +
+                                            paymentMethod +
+                                            '. Receipt history is available in Order History.',
+                                            'success'
+                                        );
+                                    }
+
 
                                     if (submitBtn) {
 
@@ -2829,6 +3115,20 @@ if (isset($_SESSION['user_id'])) {
                                             'Order Placed';
                                     }
 
+                                    form.style.display = 'none';
+
+                                    if (buyProductSummary) {
+                                        buyProductSummary.style.display = 'none';
+                                    }
+
+                                    if (buyAlert) {
+                                        buyAlert.style.display = 'none';
+                                    }
+
+                                    if (orderConfirmation) {
+                                        orderConfirmation.style.display = 'block';
+                                    }
+
 
                                     setTimeout(
                                         () => {
@@ -2836,7 +3136,7 @@ if (isset($_SESSION['user_id'])) {
                                             window.location.reload();
 
                                         },
-                                        1000
+                                        paymentReference ? 5000 : 1000
                                     );
 
 

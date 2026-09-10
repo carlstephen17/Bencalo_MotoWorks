@@ -39,9 +39,20 @@ try {
         booking_date DATE NOT NULL,
         booking_time VARCHAR(50) NOT NULL,
         notes TEXT,
+        booking_reference VARCHAR(32) NULL,
         status VARCHAR(50) DEFAULT 'Pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
+
+    $referenceColumn = $pdo->query(
+        "SHOW COLUMNS FROM service_bookings LIKE 'booking_reference'"
+    );
+
+    if (!$referenceColumn->fetch(PDO::FETCH_ASSOC)) {
+        $pdo->exec(
+            "ALTER TABLE service_bookings ADD booking_reference VARCHAR(32) NULL AFTER notes"
+        );
+    }
 
     $serviceId = filter_input(
         INPUT_POST,
@@ -67,8 +78,11 @@ try {
         throw new Exception('Please fill in all required booking fields.');
     }
 
+    $bookingReference =
+        'MWB-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
+
     $stmtService = $pdo->prepare("
-    SELECT id
+    SELECT id, name
     FROM services
     WHERE id = ?
       AND active = 1
@@ -76,11 +90,13 @@ try {
 
     $stmtService->execute([$serviceId]);
 
-    if (!$stmtService->fetchColumn()) {
+    $service = $stmtService->fetch(PDO::FETCH_ASSOC);
+
+    if (!$service) {
         throw new Exception('Selected service was not found.');
     }
 
-    $stmt = $pdo->prepare("INSERT INTO service_bookings (user_id, services_id, full_name, contact_number, vehicle_model, booking_date, booking_time, notes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())");
+    $stmt = $pdo->prepare("INSERT INTO service_bookings (user_id, services_id, full_name, contact_number, vehicle_model, booking_date, booking_time, notes, booking_reference, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())");
     $stmt->execute([
         $userId,
         $serviceId,
@@ -89,7 +105,8 @@ try {
         $vehicle,
         $bookingDate,
         $bookingTime,
-        $notes
+        $notes,
+        $bookingReference
     ]);
 
     // Clear any unintended output buffer content
@@ -97,7 +114,15 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Service appointment booked successfully!'
+        'message' => 'Service appointment booked successfully!',
+        'booking_reference' => $bookingReference,
+        'customer_name' => $fullName,
+        'service_name' => $service['name'],
+        'vehicle' => $vehicle,
+        'booking_date' => $bookingDate,
+        'booking_time' => $bookingTime,
+        'phone' => $contact,
+        'notes' => $notes
     ]);
     exit;
 } catch (Throwable $e) {

@@ -475,6 +475,8 @@ if (file_exists('components/header.php')) {
                             <th>Quantity</th>
                             <th>Price</th>
                             <th>Total Amount</th>
+                            <th>Payment</th>
+                            <th>Reference</th>
                             <th>Status</th>
                             <th>Date Placed</th>
                             <th>Actions</th>
@@ -666,6 +668,17 @@ if (file_exists('components/header.php')) {
                                                 ENT_QUOTES,
                                                 'UTF-8'
                                             ) ?>
+                                            ,
+                                            <?= htmlspecialchars(
+                                                json_encode($ord['payment_method'] ?? ''),
+                                                ENT_QUOTES,
+                                                'UTF-8'
+                                            ) ?>,
+                                            <?= htmlspecialchars(
+                                                json_encode($ord['payment_reference'] ?? ''),
+                                                ENT_QUOTES,
+                                                'UTF-8'
+                                            ) ?>
                                         )"
                                     >
                                         <i class="fa-solid fa-eye"></i>
@@ -744,6 +757,14 @@ if (file_exists('components/header.php')) {
 
                     </tbody>
 
+
+                            <td>
+                                <?= htmlspecialchars($ord['payment_method'] ?? '') ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($ord['payment_reference'] ?? 'N/A') ?>
+                            </td>
                 </table>
 
             </div>
@@ -878,6 +899,22 @@ if (file_exists('components/header.php')) {
                 </strong>
 
                 <span id="viewModalAddress"></span>
+            </div>
+
+            <div>
+                <strong style="color: #8b949e;">
+                    Payment Method:
+                </strong>
+
+                <span id="viewModalPaymentMethod"></span>
+            </div>
+
+            <div>
+                <strong style="color: #8b949e;">
+                    Payment Reference:
+                </strong>
+
+                <span id="viewModalPaymentReference"></span>
             </div>
 
         </div>
@@ -1093,7 +1130,9 @@ function openViewModal(
     date,
     fullName,
     phone,
-    address
+    address,
+    paymentMethod,
+    paymentReference
 ) {
 
     document.getElementById('viewModalOrderId').innerText =
@@ -1125,6 +1164,12 @@ function openViewModal(
 
     document.getElementById('viewModalAddress').innerText =
         address;
+
+    document.getElementById('viewModalPaymentMethod').innerText =
+        paymentMethod || 'Cash on Delivery';
+
+    document.getElementById('viewModalPaymentReference').innerText =
+        paymentReference || 'N/A';
 
     document.getElementById('viewModal').style.display =
         'flex';

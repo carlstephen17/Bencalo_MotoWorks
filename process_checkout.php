@@ -109,6 +109,10 @@ $paymentMethod =
         ?? 'Cash on Delivery'
     );
 
+$isOnlinePayment = in_array($paymentMethod, ['GCash', 'Card'], true);
+$paymentReference = ($isOnlinePayment ? 'MWP-' : 'MWO-') .
+    date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
+
 
 // =====================================================
 // VALIDATE ADDRESS
@@ -355,12 +359,21 @@ else {
 
 try {
 
+    $columnCheck = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_reference'");
+
+    if (!$columnCheck->fetch(PDO::FETCH_ASSOC)) {
+        $pdo->exec(
+            "ALTER TABLE orders ADD payment_reference VARCHAR(32) NULL AFTER payment_method"
+        );
+    }
+
     $pdo->beginTransaction();
 
 
     $orderIds = [];
 
     $grandTotal = 0.00;
+    $confirmationItems = [];
 
 
     // =================================================
@@ -414,6 +427,11 @@ try {
                 'Product not found.'
             );
         }
+
+        $confirmationItems[] = [
+            'name' => $product['name'],
+            'quantity' => $quantity
+        ];
 
 
         // ---------------------------------------------
@@ -512,6 +530,7 @@ try {
                     phone,
                     address,
                     payment_method,
+                    payment_reference,
                     status,
                     created_at,
                     user_id,
@@ -519,6 +538,7 @@ try {
                 )
                 VALUES
                 (
+                    ?,
                     ?,
                     ?,
                     ?,
@@ -560,6 +580,9 @@ try {
 
             // payment_method
             $paymentMethod,
+
+            // payment_reference
+            $paymentReference,
 
             // status
             'Pending',
@@ -605,11 +628,28 @@ try {
     $_SESSION['checkout_order_ids'] =
         $orderIds;
 
+    $_SESSION['checkout_payment_method'] = $paymentMethod;
+    $_SESSION['checkout_payment_reference'] = $paymentReference;
+    $_SESSION['checkout_confirmation'] = [
+        'customer_name' => $fullName,
+        'phone' => $phone,
+        'address' => $address,
+        'payment_method' => $paymentMethod,
+        'reference' => $paymentReference,
+        'items' => $confirmationItems
+    ];
+
     if ($isBuyNowRequest) {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'success' => true,
-            'message' => 'Order placed successfully!'
+            'message' => 'Order placed successfully!',
+            'payment_method' => $paymentMethod,
+            'payment_reference' => $paymentReference,
+            'customer_name' => $fullName,
+            'phone' => $phone,
+            'address' => $address,
+            'items' => $confirmationItems
         ]);
         exit;
     }

@@ -23,9 +23,15 @@ if (empty($_SESSION['csrf_token'])) {
 
 $checkoutSuccess = $_SESSION['checkout_success'] ?? '';
 $checkoutError = $_SESSION['checkout_error'] ?? '';
+$checkoutPaymentMethod = $_SESSION['checkout_payment_method'] ?? '';
+$checkoutPaymentReference = $_SESSION['checkout_payment_reference'] ?? '';
+$checkoutConfirmation = $_SESSION['checkout_confirmation'] ?? [];
 
 unset($_SESSION['checkout_success']);
 unset($_SESSION['checkout_error']);
+unset($_SESSION['checkout_payment_method']);
+unset($_SESSION['checkout_payment_reference']);
+unset($_SESSION['checkout_confirmation']);
 
 // =====================================================
 // CHECKOUT USER INFORMATION
@@ -706,6 +712,118 @@ if (
         #checkout-modal.active {
 
             display: flex;
+        }
+
+        .payment-receipt-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.72);
+        }
+
+        .payment-receipt-modal.active {
+            display: flex;
+        }
+
+        .payment-receipt-card {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            padding: 32px 28px;
+            border: 1px solid #2dd4bf;
+            border-radius: 10px;
+            background: #102a2d;
+            color: #f8fafc;
+            text-align: center;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+        }
+
+        .payment-receipt-close {
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            border: 0;
+            background: transparent;
+            color: #cbd5e1;
+            font-size: 1.7rem;
+            cursor: pointer;
+        }
+
+        .payment-receipt-icon {
+            color: #2dd4bf;
+            font-size: 3rem;
+        }
+
+        .payment-receipt-card h2 {
+            margin: 10px 0 8px;
+        }
+
+        .payment-receipt-card p {
+            color: #cbd5e1;
+        }
+
+        .receipt-detail-list {
+            display: grid;
+            gap: 8px;
+            margin-top: 18px;
+            text-align: left;
+        }
+
+        .receipt-detail-list div {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(203, 213, 225, 0.16);
+        }
+
+        .receipt-detail-list span {
+            color: #99f6e4;
+            font-size: 0.8rem;
+        }
+
+        .receipt-detail-list strong {
+            max-width: 68%;
+            color: #f8fafc;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .payment-reference-box {
+            margin: 24px 0 12px;
+            padding: 15px;
+            border: 1px dashed #5eead4;
+            background: rgba(15, 118, 110, 0.2);
+        }
+
+        .payment-reference-box span {
+            display: block;
+            margin-bottom: 6px;
+            color: #99f6e4;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .payment-reference-box strong {
+            color: #ffffff;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
+        }
+
+        .payment-receipt-method {
+            font-size: 0.9rem;
+        }
+
+        .payment-receipt-history {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 12px;
+            text-decoration: none;
         }
 
 
@@ -1448,6 +1566,46 @@ if (
 
     </div>
 
+    <div
+        id="payment-receipt-modal"
+        class="payment-receipt-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-receipt-title"
+    >
+        <div class="payment-receipt-card">
+            <button
+                type="button"
+                class="payment-receipt-close"
+                onclick="closePaymentReceiptModal()"
+                aria-label="Close payment receipt"
+            >&times;</button>
+
+            <div class="payment-receipt-icon">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h2 id="payment-receipt-title">Order Receipt</h2>
+            <p>Your order was recorded. Review the receipt details below.</p>
+            <div class="receipt-detail-list">
+                <div><span>Customer</span><strong><?= htmlspecialchars($checkoutConfirmation['customer_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <div><span>Order</span><strong><?php foreach (($checkoutConfirmation['items'] ?? []) as $itemIndex => $item): ?><?= htmlspecialchars($item['name'] ?? '', ENT_QUOTES, 'UTF-8') ?> (x<?= (int)($item['quantity'] ?? 0) ?>)<?php if ($itemIndex < count($checkoutConfirmation['items']) - 1): ?>, <?php endif; ?><?php endforeach; ?></strong></div>
+                <div><span>Phone</span><strong><?= htmlspecialchars($checkoutConfirmation['phone'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <div><span>Address</span><strong><?= htmlspecialchars($checkoutConfirmation['address'] ?? '', ENT_QUOTES, 'UTF-8') ?></strong></div>
+                <div><span>Payment method</span><strong><?= htmlspecialchars($checkoutConfirmation['payment_method'] ?? $checkoutPaymentMethod, ENT_QUOTES, 'UTF-8') ?></strong></div>
+            </div>
+            <div class="payment-reference-box">
+                <span>Reference number</span>
+                <strong><?= htmlspecialchars($checkoutPaymentReference, ENT_QUOTES, 'UTF-8') ?></strong>
+            </div>
+            <p class="payment-receipt-method">
+                Method: <?= htmlspecialchars($checkoutPaymentMethod, ENT_QUOTES, 'UTF-8') ?>
+            </p>
+            <a href="order_history.php" class="btn btn-primary payment-receipt-history">
+                <i class="fa-solid fa-receipt"></i> View receipt history
+            </a>
+        </div>
+    </div>
+
 
     <!-- JAVASCRIPT -->
 
@@ -1519,6 +1677,15 @@ if (
                 '';
         }
 
+        function closePaymentReceiptModal() {
+            const modal = document.getElementById('payment-receipt-modal');
+
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+
 
         // =====================================================
         // CLOSE MODAL WHEN CLICKING OUTSIDE
@@ -1533,12 +1700,20 @@ if (
                         'checkout-modal'
                     );
 
+                const receiptModal = document.getElementById(
+                    'payment-receipt-modal'
+                );
+
                 if (
                     modal &&
                     event.target === modal
                 ) {
 
                     closeCheckoutModal();
+                }
+
+                if (receiptModal && event.target === receiptModal) {
+                    closePaymentReceiptModal();
                 }
             }
         );
@@ -1554,9 +1729,16 @@ if (
             'load',
             function () {
 
-                alert(
-                    <?= json_encode($checkoutSuccess) ?>
-                );
+                <?php if ($checkoutPaymentReference): ?>
+                const receiptModal = document.getElementById('payment-receipt-modal');
+
+                if (receiptModal) {
+                    receiptModal.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                }
+                <?php else: ?>
+                alert(<?= json_encode($checkoutSuccess) ?>);
+                <?php endif; ?>
 
             }
         );

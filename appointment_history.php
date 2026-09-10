@@ -523,6 +523,10 @@ if (isset($pdo)) {
                             $app['notes']
                             ?? '',
 
+                        'booking_reference' =>
+                            $app['booking_reference']
+                            ?? '',
+
                         'status' =>
                             $status
                     ];
@@ -532,6 +536,10 @@ if (isset($pdo)) {
                     <tr>
 
 
+
+                        <th>
+                            Reference
+                        </th>
                         <!-- NUMBER -->
 
                         <td
@@ -692,6 +700,14 @@ if (isset($pdo)) {
 
 
                         <!-- ACTIONS -->
+
+                        <td>
+                            <?= htmlspecialchars(
+                                $app['booking_reference'] ?? 'N/A',
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
+                        </td>
 
                         <td>
 
@@ -875,6 +891,21 @@ if (isset($pdo)) {
             </span>
 
             <span id="view_status_badge">
+                -
+            </span>
+
+        </div>
+
+        <div class="view-detail-group">
+
+            <span class="detail-label">
+                Booking Reference
+            </span>
+
+            <span
+                class="detail-value highlight"
+                id="view_booking_reference"
+            >
                 -
             </span>
 
@@ -1280,6 +1311,12 @@ function openViewModal(booking) {
     statusBadge.textContent =
         status.charAt(0).toUpperCase() +
         status.slice(1);
+
+    document.getElementById(
+        'view_booking_reference'
+    ).textContent =
+        booking.booking_reference ||
+        'N/A';
 
 
     document.getElementById(
