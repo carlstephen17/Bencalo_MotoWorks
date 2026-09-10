@@ -58,9 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Save to Database
             if (isset($pdo)) {
                 try {
-                    // Note: Included subject column if your DB supports it, or appended to message. Adjust if needed.
-                    $stmt = $pdo->prepare("INSERT INTO testimonials (name, email, message, image, status, created_at) VALUES (?, ?, ?, ?, 'approved', NOW())");
-                    $stmt->execute([$user_name, $user_email, "Subject: $subject\n\n$message", $imagePath]);
+                    $stmt = $pdo->prepare("INSERT INTO testimonials (name, email, subject, message, image, status, created_at) VALUES (?, ?, ?, ?, ?, 'approved', NOW())");
+                    $stmt->execute([$user_name, $user_email, $subject, $message, $imagePath]);
 
                     $success_message = 'Thank you! Your message and review have been submitted successfully.';
                     // Clear inputs on success

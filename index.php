@@ -124,13 +124,13 @@ $db_testimonials = [];
 if (isset($pdo)) {
     try {
         // Check if the image column exists by attempting to select it
-        $stmt = $pdo->prepare("SELECT name, message, created_at, image FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 4");
+        $stmt = $pdo->prepare("SELECT name, subject, message, created_at, image FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 4");
         $stmt->execute();
         $db_testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
         // Fallback if the image column hasn't been added to your database table yet
         try {
-            $stmt = $pdo->prepare("SELECT name, message, created_at FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 4");
+            $stmt = $pdo->prepare("SELECT name, subject, message, created_at FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 4");
             $stmt->execute();
             $db_testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $ex) {
@@ -143,10 +143,17 @@ if (isset($pdo)) {
 $testimonials_to_display = $default_testimonials;
 foreach ($db_testimonials as $index => $db_t) {
     if (isset($testimonials_to_display[$index])) {
+        $subject = trim($db_t['subject'] ?? '');
+        $message = $db_t['message'] ?? '';
+        if ($subject === '' && preg_match('/^Subject:\s*(.*?)\R\R(.*)$/s', $message, $matches)) {
+            $subject = trim($matches[1]);
+            $message = $matches[2];
+        }
         $testimonials_to_display[$index] = [
             "name" => $db_t['name'],
             "location" => "Contact Page Review",
-            "message" => $db_t['message'],
+            "subject" => $subject,
+            "message" => $message,
             "image" => !empty($db_t['image']) ? $db_t['image'] : ''
         ];
     }
@@ -235,6 +242,9 @@ foreach ($db_testimonials as $index => $db_t) {
                                 <i class="fa-solid fa-star"></i>
                                 <i class="fa-solid fa-star"></i>
                             </div>
+                            <?php if (!empty($t['subject'])): ?>
+                                <div style="font-size: 0.9rem; line-height: 1.5; color: #fff; font-weight: 600; margin-bottom: 8px;">Subject: <?= htmlspecialchars($t['subject']) ?></div>
+                            <?php endif; ?>
                             <p style="font-size: 0.95rem; line-height: 1.6; color: var(--color-text-muted, #d0d0d0); font-style: italic; margin: 0;">"<?= htmlspecialchars($t['message']) ?>"</p>
                         </div>
                     </div>
