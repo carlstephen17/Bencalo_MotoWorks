@@ -1,6 +1,6 @@
 <?php
 // /admin/admin_users.php
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 require_once '../includes/config.php';
 /** @var PDO $pdo */
 require_once '../includes/auth.php';
@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 }
 
 // Fetch all registered users/customers (excluding passwords)
-$stmt = $pdo->query("SELECT id, username, first_name, last_name, email, phone, role, created_at FROM users ORDER BY id ASC");
+$stmt = $pdo->query("SELECT userId AS id, userId, username, userFirstName AS first_name, userLastName AS last_name, userEmail AS email, userPhone AS phone, userRole AS role, userCreatedAt AS created_at FROM `user` ORDER BY userId ASC");
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -29,14 +29,15 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 30px;
-            height: 30px;
+            min-height: 30px;
+            padding: 6px 9px;
             border: none;
             border-radius: 4px;
             color: #fff;
             cursor: pointer;
             font-size: 0.85rem;
             margin-right: 4px;
+            gap: 4px;
             transition: opacity 0.2s;
         }
 
@@ -187,12 +188,32 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="alert-toast" style="background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px;"><?= htmlspecialchars($_GET['msg']) ?></div>
                 <?php endif; ?>
 
+                <details style="background: #fff; padding: 18px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <summary style="cursor: pointer; font-weight: 600;">Create User or Staff Account</summary>
+                    <form method="POST" action="actions/admin_users_create.php" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 16px;">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="text" name="first_name" placeholder="First name" maxlength="50" required class="form-control">
+                        <input type="text" name="last_name" placeholder="Last name" maxlength="50" required class="form-control">
+                        <input type="text" name="username" placeholder="Username" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]{3,50}" required class="form-control">
+                        <input type="email" name="email" placeholder="Email" maxlength="100" required class="form-control">
+                        <input type="tel" name="phone" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" minlength="11" maxlength="11" required class="form-control">
+                        <input type="password" name="password" placeholder="Temporary password (8+ characters)" minlength="8" required class="form-control">
+                        <select name="role" required class="form-control">
+                            <option value="customer">Customer</option>
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button type="submit" class="btn-submit">Create Account</button>
+                    </form>
+                </details>
+
                 <!-- Live Search & Role Filter Bar -->
                 <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                     <input type="text" id="liveSearchInput" placeholder="Search username, name, email, or phone..." class="form-control" style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff;">
                     <select id="roleFilterSelect" class="form-control" style="width: 180px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff;">
                         <option value="">All Roles</option>
                         <option value="admin">Admin</option>
+                        <option value="staff">Staff</option>
                         <option value="customer">Customer</option>
                     </select>
                 </div>
@@ -226,15 +247,15 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <td><?= htmlspecialchars($u['phone'] ?? 'N/A') ?></td>
                                         <td>
                                             <span class="badge role-badge" style="padding: 4px 8px; border-radius: 4px; background: 
-                                                <?= ($u['role'] === 'admin') ? '#e3f2fd; color: #1976d2;' : '#f3e5f5; color: #7b1fa2;' ?>">
+                                                <?= ($u['role'] === 'admin') ? '#e3f2fd; color: #1976d2;' : (($u['role'] === 'staff') ? '#dcfce7; color: #166534;' : '#f3e5f5; color: #7b1fa2;') ?>">
                                                 <?= htmlspecialchars(ucfirst($u['role'] ?? 'user')) ?>
                                             </span>
                                         </td>
                                         <td><?= htmlspecialchars($u['created_at'] ?? 'N/A') ?></td>
-                                        <td>
-                                            <button type="button" class="action-btn view-btn" title="View User" onclick='openViewModal(<?= json_encode($u) ?>)'><i class="fas fa-eye"></i></button>
-                                            <button type="button" class="action-btn edit-btn" title="Edit User" onclick='openEditModal(<?= json_encode($u) ?>)'><i class="fas fa-pen-to-square"></i></button>
-                                            <button type="button" class="action-btn delete-btn" title="Delete User" onclick='openDeleteModal(<?= $u['id'] ?>)'><i class="fas fa-trash"></i></button>
+                                        <td class="table-row-actions">
+                                            <button type="button" class="action-btn view-btn" title="View User" onclick='openViewModal(<?= htmlspecialchars(json_encode($u, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, "UTF-8") ?>)'><i class="fas fa-eye"></i> View</button>
+                                            <button type="button" class="action-btn edit-btn" title="Edit User" onclick='openEditModal(<?= htmlspecialchars(json_encode($u, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, "UTF-8") ?>)'><i class="fas fa-pen-to-square"></i> Edit</button>
+                                            <button type="button" class="action-btn delete-btn" title="Delete User" onclick='openDeleteModal(<?= $u['id'] ?>)'><i class="fas fa-trash"></i> Delete</button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -271,6 +292,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <button type="button" class="close-modal" onclick="closeModals()">&times;</button>
             <h3>Edit User Account</h3>
             <form method="POST" action="actions/admin_users_update.php">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="user_id" id="edit-id">
                 <div class="form-group">
                     <label>First Name</label>
@@ -282,7 +304,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" name="username" id="edit-username" class="form-control" required>
+                    <input type="text" name="username" id="edit-username" class="form-control" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]{3,50}" required>
                 </div>
                 <div class="form-group">
                     <label>Email Address</label>
@@ -290,12 +312,13 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 <div class="form-group">
                     <label>Phone Number</label>
-                    <input type="tel" name="phone" id="edit-phone" class="form-control" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11" title="Enter an 11-digit Philippine mobile number starting with 09">
+                    <input type="tel" name="phone" id="edit-phone" class="form-control" inputmode="numeric" pattern="09[0-9]{9}" minlength="11" maxlength="11" title="Enter an 11-digit Philippine mobile number starting with 09" required>
                 </div>
                 <div class="form-group">
                     <label>Role</label>
                     <select name="role" id="edit-role" class="form-control" required>
                         <option value="customer">Customer</option>
+                        <option value="staff">Staff</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
@@ -314,6 +337,7 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <h3>Confirm User Deletion</h3>
             <p style="color: #555; margin-bottom: 20px;">Are you sure you want to delete this user account? This action is permanent and cannot be undone.</p>
             <form method="POST" action="actions/admin_users_delete.php">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="user_id" id="delete-id">
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="closeModals()">Cancel</button>

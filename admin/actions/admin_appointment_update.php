@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . '/../../includes/auth.php';
 
 require_once '../../includes/config.php';
 /** @var PDO $pdo */
@@ -56,22 +56,13 @@ $appointment_id = filter_input(
     FILTER_VALIDATE_INT
 );
 
-$full_name = trim($_POST['full_name'] ?? '');
-
-$contact_number = trim(
-    $_POST['contact_number'] ?? ''
-);
-
 $vehicle_model = trim(
     $_POST['vehicle_model'] ?? ''
 );
 
-
-// IMPORTANT:
-// Your appointment table uses services_id
-$services_id = filter_input(
+$service_id = filter_input(
     INPUT_POST,
-    'services_id',
+    'service_id',
     FILTER_VALIDATE_INT
 );
 
@@ -87,6 +78,10 @@ $status = trim(
     $_POST['status'] ?? 'Pending'
 );
 
+$rejection_reason = trim(
+    $_POST['rejection_reason'] ?? ''
+);
+
 $notes = trim(
     $_POST['notes'] ?? ''
 );
@@ -98,32 +93,29 @@ $notes = trim(
 
 $allowed_statuses = [
     'Pending',
-    'Confirmed',
+    'Cancelled',
     'Completed',
-    'Cancelled'
 ];
 
-if (!in_array($status, $allowed_statuses, true)) {
-    $status = 'Pending';
-}
-
-
-// =========================================================
-// REQUIRED FIELDS
-// =========================================================
+$date = DateTimeImmutable::createFromFormat('!Y-m-d', $booking_date);
+$validTime = preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/', $booking_time) === 1;
 
 if (
     !$appointment_id ||
-    empty($full_name) ||
-    !preg_match('/^09[0-9]{9}$/', $contact_number) ||
-    !$services_id ||
-    empty($booking_date) ||
-    empty($booking_time)
+    $vehicle_model === '' ||
+    mb_strlen($vehicle_model) > 255 ||
+    !$service_id ||
+    !$date ||
+    $date->format('Y-m-d') !== $booking_date ||
+    !$validTime ||
+    !in_array($status, $allowed_statuses, true) ||
+    mb_strlen($rejection_reason) > 1000 ||
+    mb_strlen($notes) > 2000
 ) {
 
     header(
         'Location: ../admin_appointment.php?msg=' .
-        urlencode('Please fill in all required fields')
+        urlencode('Please provide valid appointment details.')
     );
 
     exit();
@@ -136,14 +128,24 @@ if (
 
 try {
 
+    $existingAppointment = $pdo->prepare('SELECT bookingStatus FROM service_booking WHERE bookingId = ?');
+    $existingAppointment->execute([$appointment_id]);
+    $currentStatus = $existingAppointment->fetchColumn();
+    if ($currentStatus === false) {
+        header('Location: ../admin_appointment.php?msg=' . urlencode('Appointment not found.'));
+        exit();
+    }
+    if (strtolower(trim((string) $currentStatus)) === 'completed') {
+        header('Location: ../admin_appointment.php?msg=' . urlencode('Completed appointments cannot be edited.'));
+        exit();
+    }
+
     $serviceCheck = $pdo->prepare("
-        SELECT id
-        FROM services
-        WHERE id = ?
+        SELECT serviceId as id FROM service WHERE serviceId = ?
     ");
 
     $serviceCheck->execute([
-        $services_id
+        $service_id
     ]);
 
     if (!$serviceCheck->fetch()) {
@@ -162,38 +164,32 @@ try {
     // =====================================================
 
     $stmt = $pdo->prepare("
-        UPDATE service_bookings
-        SET
-            full_name = ?,
-            contact_number = ?,
-            vehicle_model = ?,
-            services_id = ?,
-            booking_date = ?,
-            booking_time = ?,
-            status = ?,
-            notes = ?
-        WHERE id = ? AND LOWER(TRIM(status)) <> 'completed'
+        UPDATE service_booking
+        SET bookingVehicleModel = ?, serviceId = ?, bookingDate = ?, bookingTime = ?,
+            bookingStatus = ?, bookingNotes = ?, bookingRejectionReason = ?
+        WHERE bookingId = ? AND LOWER(TRIM(bookingStatus)) <> 'completed'
     ");
 
 
     $stmt->execute([
-        $full_name,
-        $contact_number,
         $vehicle_model,
-        $services_id,
+        $service_id,
         $booking_date,
         $booking_time,
         $status,
         $notes,
+        $status === 'Cancelled' ? $rejection_reason : null,
         $appointment_id
     ]);
 
     if ($stmt->rowCount() === 0) {
-        header(
-            'Location: ../admin_appointment.php?msg=' .
-            urlencode('Completed appointments cannot be edited')
-        );
-        exit();
+        $statusCheck = $pdo->prepare('SELECT bookingStatus FROM service_booking WHERE bookingId = ?');
+        $statusCheck->execute([$appointment_id]);
+        $updatedStatus = $statusCheck->fetchColumn();
+        if ($updatedStatus === false || strtolower(trim((string) $updatedStatus)) === 'completed') {
+            header('Location: ../admin_appointment.php?msg=' . urlencode('Completed appointments cannot be edited.'));
+            exit();
+        }
     }
 
 
@@ -211,6 +207,7 @@ try {
 
 } catch (PDOException $e) {
 
+    error_log('Admin appointment update failed: ' . $e->getMessage());
 
     // =====================================================
     // ERROR
@@ -219,8 +216,7 @@ try {
     header(
         'Location: ../admin_appointment.php?msg=' .
         urlencode(
-            'Failed to update appointment: ' .
-            $e->getMessage()
+            'Failed to update appointment. Check the submitted details and try again.'
         )
     );
 

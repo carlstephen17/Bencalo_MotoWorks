@@ -1,66 +1,67 @@
 <?php
 // /admin/actions/admin_product_update.php
-session_start();
-require_once '../../includes/config.php';
-/** @var PDO $pdo */
 require_once '../../includes/auth.php';
+require_once '../../includes/config.php';
+require_once '../includes/upload_helpers.php';
+/** @var PDO $pdo */
 
 if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     header('Location: ../../login.php');
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['csrf_token'] ?? '';
-    if (!verifyCSRFToken($token)) {
-        header('Location: ../admin_products.php?msg=Invalid+Security+Token');
-        exit();
-    }
-
-    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
-    $name = trim($_POST['name'] ?? '');
-    $price = filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT);
-    $stock = filter_input(INPUT_POST, 'stock', FILTER_VALIDATE_INT);
-
-    if ($id && !empty($name) && $price !== false && $price >= 0 && $stock !== false && $stock >= 0) {
-        // Check if a new image was uploaded
-        $imageClause = "";
-        $params = [$name, $price, $stock];
-
-        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['image']['tmp_name'];
-            $fileName = $_FILES['image']['name'];
-            $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-            if (in_array($fileExtension, $allowedExtensions)) {
-                $newFileName = md5(time() . $fileName) . '.' . $fileExtension;
-                $uploadFileDir = '../../uploads/';
-                
-                if (!is_dir($uploadFileDir)) {
-                    mkdir($uploadFileDir, 0755, true);
-                }
-                
-                $dest_path = $uploadFileDir . $newFileName;
-                if (move_uploaded_file($fileTmpPath, $dest_path)) {
-                    $imageClause = ", image = ?";
-                    $params[] = $newFileName;
-                }
-            }
-        }
-
-        $params[] = $id;
-        $stmt = $pdo->prepare("UPDATE products SET name = ?, price = ?, stock = ?{$imageClause} WHERE id = ?");
-        $stmt->execute($params);
-
-        header('Location: ../admin_products.php?msg=Product+successfully+updated');
-        exit();
-    }
-
-    header('Location: ../admin_products.php?msg=Invalid+product+parameters');
-    exit();
-} else {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../admin_products.php');
     exit();
 }
-?>
+
+requireValidCSRFToken();
+
+$id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+$name = trim((string) ($_POST['name'] ?? ''));
+$price = filter_var($_POST['price'] ?? null, FILTER_VALIDATE_FLOAT);
+$stock = filter_var($_POST['stock'] ?? null, FILTER_VALIDATE_INT);
+$active = $_POST['active'] ?? null;
+
+if (!$id || $id < 1 || $name === '' || mb_strlen($name) > 255 || $price === false || $price < 0 || $stock === false || $stock < 0 || !in_array($active, ['0', '1', 0, 1], true)) {
+    header('Location: ../admin_products.php?msg=' . urlencode('Please provide valid product details.'));
+    exit();
+}
+
+$existingStmt = $pdo->prepare('SELECT productImage FROM product WHERE productId = ?');
+$existingStmt->execute([$id]);
+$existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+if (!$existing) {
+    header('Location: ../admin_products.php?msg=' . urlencode('Product not found.'));
+    exit();
+}
+
+try {
+    $newImagePath = saveAdminImageUpload($_FILES['image'] ?? []);
+} catch (RuntimeException $error) {
+    header('Location: ../admin_products.php?msg=' . urlencode($error->getMessage()));
+    exit();
+}
+
+try {
+    if ($newImagePath === null) {
+        $stmt = $pdo->prepare('UPDATE product SET productName = ?, productPrice = ?, productStock = ?, productActive = ? WHERE productId = ?');
+        $stmt->execute([$name, $price, $stock, (int) $active, $id]);
+    } else {
+        $stmt = $pdo->prepare('UPDATE product SET productName = ?, productPrice = ?, productStock = ?, productActive = ?, productImage = ? WHERE productId = ?');
+        $stmt->execute([$name, $price, $stock, (int) $active, $newImagePath, $id]);
+    }
+} catch (PDOException $error) {
+    if ($newImagePath !== null && !removeAdminImageUpload($newImagePath)) {
+        error_log('Unable to remove image after product update failed: ' . $newImagePath);
+    }
+    error_log('Product update failed: ' . $error->getMessage());
+    header('Location: ../admin_products.php?msg=' . urlencode('Unable to update product. Please try again.'));
+    exit();
+}
+
+if ($newImagePath !== null && !empty($existing['productImage']) && str_starts_with($existing['productImage'], 'uploads/') && !removeAdminImageUpload($existing['productImage'])) {
+    error_log('Unable to remove replaced product image: ' . $existing['productImage']);
+}
+header('Location: ../admin_products.php?msg=' . urlencode('Product successfully updated.'));
+exit();

@@ -1,15 +1,11 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/image_upload.php';
+generateCSRFToken();
 
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
-}
-
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 $configFile = __DIR__ . '/includes/config.php';
@@ -33,7 +29,7 @@ $user = [
 
 if (isset($pdo)) {
     try {
-        $stmt = $pdo->prepare("SELECT username, first_name, last_name, email, phone, avatar FROM users WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT username, userFirstName AS first_name, userLastName AS last_name, userEmail AS email, userPhone AS phone, userAvatar AS avatar FROM `user` WHERE userId = ?");
         $stmt->execute([$userId]);
         $fetchedUser = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($fetchedUser) {
@@ -46,48 +42,35 @@ if (isset($pdo)) {
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
         $error_message = 'Invalid security token. Please refresh and try again.';
     } else {
-        $firstName = trim($_POST['first_name'] ?? '');
-        $lastName = trim($_POST['last_name'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $phone = trim($_POST['phone'] ?? '');
+        $firstName = trim((string) ($_POST['first_name'] ?? ''));
+        $lastName = trim((string) ($_POST['last_name'] ?? ''));
+        $email = trim((string) ($_POST['email'] ?? ''));
+        $phone = trim((string) ($_POST['phone'] ?? ''));
         $avatarPath = $user['avatar']; // Retain existing avatar by default
 
-        if (empty($firstName) || empty($lastName) || empty($email)) {
+        if ($firstName === '' || $lastName === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($firstName) > 50 || mb_strlen($lastName) > 50 || mb_strlen($email) > 100 || ($phone !== '' && !preg_match('/^09[0-9]{9}$/', $phone))) {
             $error_message = 'First name, last name, and email are required fields.';
         } else {
-            // Handle optional avatar upload
-            if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-                $fileTmpPath = $_FILES['avatar']['tmp_name'];
-                $fileName = $_FILES['avatar']['name'];
-                $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-                $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-                if (in_array($fileExtension, $allowedExtensions)) {
-                    $uploadDir = __DIR__ . '/images/avatars/';
-                    if (!is_dir($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
-                    }
-
-                    $newFileName = 'avatar_' . $userId . '_' . time() . '.' . $fileExtension;
-                    $destPath = $uploadDir . $newFileName;
-
-                    if (move_uploaded_file($fileTmpPath, $destPath)) {
-                        $avatarPath = 'images/avatars/' . $newFileName;
-                    } else {
-                        $error_message = 'Failed to move uploaded avatar file. Check folder permissions.';
-                    }
-                } else {
-                    $error_message = 'Invalid avatar file type. Allowed: JPG, PNG, WEBP.';
+            try {
+                $newAvatar = saveSiteImageUpload($_FILES['avatar'] ?? [], 'avatars');
+                if ($newAvatar !== null) {
+                    $avatarPath = $newAvatar;
                 }
+            } catch (RuntimeException $uploadError) {
+                $error_message = $uploadError->getMessage();
             }
 
             if (empty($error_message) && isset($pdo)) {
                 try {
-                    $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, email = ?, phone = ?, avatar = ? WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE `user` SET userFirstName = ?, userLastName = ?, userEmail = ?, userPhone = ?, userAvatar = ? WHERE userId = ?");
                     $stmt->execute([$firstName, $lastName, $email, $phone, $avatarPath, $userId]);
+
+                    if ($avatarPath !== $user['avatar'] && !empty($user['avatar']) && !removeSiteAvatarUpload($user['avatar'])) {
+                        error_log('Unable to remove replaced profile avatar: ' . $user['avatar']);
+                    }
 
                     // Update session variables
                     $_SESSION['user_name'] = $firstName . ' ' . $lastName;
@@ -100,8 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user['avatar'] = $avatarPath;
 
                     $success_message = 'Profile updated successfully!';
-                } catch (Exception $e) {
-                    $error_message = 'Database error: ' . $e->getMessage();
+                } catch (PDOException $e) {
+                    if ($avatarPath !== $user['avatar'] && !removeSiteAvatarUpload($avatarPath)) {
+                        error_log('Unable to remove uploaded avatar after profile update failed: ' . $avatarPath);
+                    }
+                    error_log('Profile update failed: ' . $e->getMessage());
+                    $error_message = $e->getCode() === '23000'
+                        ? 'That email address is already associated with an account.'
+                        : 'Unable to update your profile right now. Please try again.';
                 }
             } elseif (!isset($pdo)) {
                 $error_message = 'Database connection not available.';
@@ -317,7 +306,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 <h3><?= htmlspecialchars(trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) ?: 'System User') ?></h3>
                 <p>@<?= htmlspecialchars($user['username'] ?? '') ?></p>
-                <a href="logout.php" class="btn-submit" style="background: #dc3545; color: #fff; text-decoration: none; display: inline-block; text-align: center;">Logout</a>
+                <form method="POST" action="logout.php">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="submit" class="btn-submit" style="background: #dc3545; color: #fff;">Logout</button>
+                </form>
             </div>
 
             <!-- Profile Edit Form Card -->

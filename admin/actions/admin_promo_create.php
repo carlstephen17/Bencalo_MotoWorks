@@ -1,37 +1,71 @@
 <?php
-// /admin/actions/admin_promo_create.php
-session_start();
+require_once '../../includes/auth.php';
 require_once '../../includes/config.php';
 /** @var PDO $pdo */
-require_once '../../includes/auth.php';
 
 if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     header('Location: ../../login.php');
     exit();
 }
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fullname = trim($_POST['fullname'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $bundle_slug = trim($_POST['bundle_slug'] ?? '');
-    $selected_option = trim($_POST['selected_option'] ?? '');
-    $appointment_date = trim($_POST['appointment_date'] ?? '');
-    $appointment_time = trim($_POST['appointment_time'] ?? '');
-    $status = trim($_POST['status'] ?? 'Active');
-
-    if (!empty($fullname) && preg_match('/^09[0-9]{9}$/', $phone) && !empty($bundle_slug) && !empty($appointment_date)) {
-        $stmt = $pdo->prepare("INSERT INTO promo_claims (fullname, phone, bundle_slug, selected_option, appointment_date, appointment_time, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        if ($stmt->execute([$fullname, $phone, $bundle_slug, $selected_option, $appointment_date, $appointment_time, $status])) {
-            header('Location: ../admin_promos.php?msg=Promo+claim+added+successfully');
-            exit();
-        } else {
-            header('Location: ../admin_promos.php?msg=Failed+to+add+promo+claim');
-            exit();
-        }
-    } else {
-        header('Location: ../admin_promos.php?msg=Please+fill+in+all+required+fields');
-        exit();
-    }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../admin_promos.php');
+    exit();
 }
-header('Location: ../admin_promos.php');
+requireValidCSRFToken();
+
+$title = trim((string) ($_POST['title'] ?? ''));
+$slug = trim((string) ($_POST['slug'] ?? ''));
+$badge = trim((string) ($_POST['badge'] ?? ''));
+$description = trim((string) ($_POST['description'] ?? ''));
+$itemLabel = trim((string) ($_POST['item_label'] ?? ''));
+$itemOptions = trim((string) ($_POST['item_options'] ?? ''));
+$perks = trim((string) ($_POST['perks'] ?? ''));
+$productImage = trim((string) ($_POST['product_image'] ?? ''));
+$serviceImage = trim((string) ($_POST['service_image'] ?? ''));
+$productIcon = trim((string) ($_POST['product_icon'] ?? ''));
+$serviceIcon = trim((string) ($_POST['service_icon'] ?? ''));
+$active = $_POST['active'] ?? null;
+
+if (
+    $title === '' || mb_strlen($title) > 255 ||
+    !preg_match('/^[A-Za-z0-9_-]{1,100}$/', $slug) ||
+    $badge === '' || mb_strlen($badge) > 50 ||
+    $description === '' || strlen($description) > 65535 ||
+    $itemLabel === '' || mb_strlen($itemLabel) > 255 ||
+    $itemOptions === '' || strlen($itemOptions) > 65535 ||
+    strlen($perks) > 65535 ||
+    mb_strlen($productImage) > 255 || mb_strlen($serviceImage) > 255 ||
+    mb_strlen($productIcon) > 100 || mb_strlen($serviceIcon) > 100 ||
+    !in_array($active, ['0', '1', 0, 1], true)
+) {
+    header('Location: ../admin_promos.php?msg=' . urlencode('Please provide valid promo details.'));
+    exit();
+}
+
+try {
+    $stmt = $pdo->prepare(
+        'INSERT INTO promo
+            (promoSlug, promoTitle, promoBadge, promoDescription, promoItemLabel,
+             promoItemOptions, promoPerks, promoProductImage, promoServiceImage,
+             promoProductIcon, promoServiceIcon, promoActive)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $stmt->execute([
+        $slug, $title, $badge, $description, $itemLabel, $itemOptions, $perks,
+        $productImage !== '' ? $productImage : null,
+        $serviceImage !== '' ? $serviceImage : null,
+        $productIcon !== '' ? $productIcon : null,
+        $serviceIcon !== '' ? $serviceIcon : null,
+        (int) $active,
+    ]);
+} catch (PDOException $error) {
+    error_log('Promo creation failed: ' . $error->getMessage());
+    $message = $error->getCode() === '23000'
+        ? 'That promo slug is already in use.'
+        : 'Unable to create promo. Please try again.';
+    header('Location: ../admin_promos.php?msg=' . urlencode($message));
+    exit();
+}
+
+header('Location: ../admin_promos.php?msg=' . urlencode('Promo successfully created.'));
 exit();

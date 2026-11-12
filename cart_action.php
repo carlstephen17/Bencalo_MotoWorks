@@ -1,8 +1,5 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
+require_once __DIR__ . '/includes/auth.php';
 require_once 'includes/config.php';
 
 header('Content-Type: application/json');
@@ -13,7 +10,21 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
+    exit;
+}
+
+if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid security token. Refresh the page and try again.']);
+    exit;
+}
+
+$action = $_POST['action'] ?? '';
+if ($action !== 'add') {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Invalid cart action.']);
     exit;
 }
 
@@ -26,7 +37,7 @@ if ($product_id <= 0 || $quantity <= 0) {
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT productId as id, productName as name, productPrice as price, productStock as stock, productImage as image, productActive as active, productId, productName, productPrice, productStock, productImage, productActive FROM product WHERE productId = ?");
     $stmt->execute([$product_id]);
     $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -70,7 +81,9 @@ try {
         'cart_count' => $cart_count
     ]);
 
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
+} catch (Throwable $e) {
+    error_log('Cart update failed: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Unable to update the cart right now.']);
 }
 ?>

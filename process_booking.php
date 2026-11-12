@@ -1,136 +1,127 @@
 <?php
-// Suppress direct error output to keep JSON clean
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
-
-// Start output buffering immediately to catch any stray whitespace, warnings, or notices
-ob_start();
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+function respond(array $payload, int $status = 200): void
+{
+    http_response_code($status);
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 try {
-    if (empty($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
-        throw new Exception('Invalid CSRF token. Please refresh the page and try again.');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        respond(['success' => false, 'message' => 'Method not allowed.'], 405);
     }
 
-    // Support both regular user sessions and admin sessions
-    $userId = $_SESSION['user_id'] ?? $_SESSION['admin_id'] ?? null;
-    if (!$userId) {
-        throw new Exception('Please log in to book a service appointment.');
+    $sessionToken = $_SESSION['csrf_token'] ?? '';
+    $submittedToken = $_POST['csrf_token'] ?? '';
+    if (!is_string($sessionToken) || $sessionToken === '' || !is_string($submittedToken) || !hash_equals($sessionToken, $submittedToken)) {
+        respond(['success' => false, 'message' => 'Invalid security token. Refresh the page and try again.'], 403);
     }
 
-    require_once 'includes/config.php';
-    if (!isset($pdo)) {
-        throw new Exception('Database connection unavailable in config.php.');
+    $userId = filter_var($_SESSION['user_id'] ?? null, FILTER_VALIDATE_INT);
+    if (!$userId || $userId < 1) {
+        respond(['success' => false, 'message' => 'Please log in to book a service.'], 401);
     }
 
-    // Automatically create table if it doesn't exist to prevent database errors
-    $pdo->exec("CREATE TABLE IF NOT EXISTS service_bookings (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        services_id INT NOT NULL,
-        full_name VARCHAR(255) NOT NULL,
-        contact_number VARCHAR(50) NOT NULL,
-        vehicle_model VARCHAR(255) NOT NULL,
-        booking_date DATE NOT NULL,
-        booking_time VARCHAR(50) NOT NULL,
-        notes TEXT,
-        booking_reference VARCHAR(32) NULL,
-        status VARCHAR(50) DEFAULT 'Pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )");
+    require_once __DIR__ . '/includes/config.php';
 
-    $referenceColumn = $pdo->query(
-        "SHOW COLUMNS FROM service_bookings LIKE 'booking_reference'"
-    );
+    $serviceValue = $_POST['service_id'] ?? $_POST['services_id'] ?? null;
+    $serviceId = filter_var($serviceValue, FILTER_VALIDATE_INT);
+    $vehicleModel = trim((string) ($_POST['vehicle_model'] ?? $_POST['vehicle'] ?? ''));
+    $bookingDate = trim((string) ($_POST['booking_date'] ?? $_POST['appointment_date'] ?? ''));
+    $bookingTime = trim((string) ($_POST['booking_time'] ?? $_POST['appointment_time'] ?? ''));
+    $promoSlug = trim((string) ($_POST['promo_slug'] ?? $_POST['bundle_slug'] ?? ''));
+    $promoOption = trim((string) ($_POST['promo_selected_option'] ?? $_POST['selected_option'] ?? ''));
+    $notes = trim((string) ($_POST['notes'] ?? ''));
 
-    if (!$referenceColumn->fetch(PDO::FETCH_ASSOC)) {
-        $pdo->exec(
-            "ALTER TABLE service_bookings ADD booking_reference VARCHAR(32) NULL AFTER notes"
-        );
+    if (!$serviceId || $serviceId < 1 || $vehicleModel === '' || $bookingDate === '' || $bookingTime === '') {
+        respond(['success' => false, 'message' => 'Select a service and complete the vehicle, date, and time fields.'], 422);
     }
 
-    $serviceId = filter_input(
-        INPUT_POST,
-        'services_id',
-        FILTER_VALIDATE_INT
-    );
-
-    if (!$serviceId) {
-        $serviceId = filter_input(
-            INPUT_POST,
-            'service_id',
-            FILTER_VALIDATE_INT
-        );
-    }
-    $fullName = trim($_POST['fullname'] ?? '');
-    $contact = trim($_POST['contact'] ?? '');
-    $vehicle = trim($_POST['vehicle'] ?? '');
-    $bookingDate = trim($_POST['booking_date'] ?? '');
-    $bookingTime = trim($_POST['booking_time'] ?? '');
-    $notes = trim($_POST['notes'] ?? '');
-
-    if (!$serviceId || empty($fullName) || empty($contact) || empty($vehicle) || empty($bookingDate) || empty($bookingTime)) {
-        throw new Exception('Please fill in all required booking fields.');
+    if (mb_strlen($vehicleModel) > 255 || mb_strlen($promoSlug) > 100 || mb_strlen($promoOption) > 255) {
+        respond(['success' => false, 'message' => 'One or more fields exceed the allowed length.'], 422);
     }
 
-    $bookingReference =
-        'MWB-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
+    if (preg_match('/^(\d{1,2}:\d{2}\s*[AP]M)(?:\s*-\s*\d{1,2}:\d{2}\s*[AP]M)?$/i', $bookingTime, $timeMatch)) {
+        $time = DateTimeImmutable::createFromFormat('!h:i A', strtoupper(trim($timeMatch[1])));
+        if ($time) {
+            $bookingTime = $time->format('H:i:s');
+        }
+    }
+    if (preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $bookingTime)) {
+        $bookingTime .= ':00';
+    }
+    if (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $bookingTime)) {
+        respond(['success' => false, 'message' => 'Enter a valid booking time.'], 422);
+    }
 
-    $stmtService = $pdo->prepare("
-    SELECT id, name
-    FROM services
-    WHERE id = ?
-      AND active = 1
-");
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $bookingDate);
+    $dateErrors = DateTimeImmutable::getLastErrors();
+    if (!$date || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0)) || $date->format('Y-m-d') !== $bookingDate) {
+        respond(['success' => false, 'message' => 'Enter a valid booking date.'], 422);
+    }
+    if ($bookingDate < date('Y-m-d')) {
+        respond(['success' => false, 'message' => 'Booking date cannot be in the past.'], 422);
+    }
 
-    $stmtService->execute([$serviceId]);
+    if ($promoSlug !== '' && (!preg_match('/^[a-zA-Z0-9_-]+$/', $promoSlug) || $promoOption === '')) {
+        respond(['success' => false, 'message' => 'Choose a valid promo and promo option.'], 422);
+    }
 
-    $service = $stmtService->fetch(PDO::FETCH_ASSOC);
+    $userStmt = $pdo->prepare('SELECT userId as id, userFirstName as first_name, userLastName as last_name, userEmail as email, userPhone as phone, userId, userFirstName, userLastName, userEmail, userPhone FROM `user` WHERE userId = ? LIMIT 1');
+    $userStmt->execute([$userId]);
+    $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$user) {
+        respond(['success' => false, 'message' => 'Your account could not be found. Please sign in again.'], 401);
+    }
 
+    $serviceStmt = $pdo->prepare('SELECT serviceId as id, serviceName as name, serviceId, serviceName FROM service WHERE serviceId = ? AND serviceActive = 1 LIMIT 1');
+    $serviceStmt->execute([$serviceId]);
+    $service = $serviceStmt->fetch(PDO::FETCH_ASSOC);
     if (!$service) {
-        throw new Exception('Selected service was not found.');
+        respond(['success' => false, 'message' => 'The selected service is unavailable.'], 422);
     }
 
-    $stmt = $pdo->prepare("INSERT INTO service_bookings (user_id, services_id, full_name, contact_number, vehicle_model, booking_date, booking_time, notes, booking_reference, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', NOW())");
-    $stmt->execute([
-        $userId,
-        $serviceId,
-        $fullName,
-        $contact,
-        $vehicle,
-        $bookingDate,
-        $bookingTime,
-        $notes,
-        $bookingReference
+    if ($promoSlug !== '') {
+        $promoStmt = $pdo->prepare('SELECT promoItemOptions FROM promo WHERE promoSlug = ? AND promoActive = 1 LIMIT 1');
+        $promoStmt->execute([$promoSlug]);
+        $promoOptions = $promoStmt->fetchColumn();
+        $allowedOptions = $promoOptions === false
+            ? []
+            : array_values(array_filter(array_map('trim', preg_split('/\R/u', (string) $promoOptions) ?: [])));
+        if (!in_array($promoOption, $allowedOptions, true)) {
+            respond(['success' => false, 'message' => 'The selected promo or promo option is no longer available.'], 422);
+        }
+    }
+
+    $insert = $pdo->prepare(
+        'INSERT INTO service_booking (userId, serviceId, bookingVehicleModel, bookingDate, bookingTime, bookingBundleSlug, bookingBundleOption, bookingStatus, bookingNotes, bookingCreatedAt) VALUES (:user_id, :service_id, :vehicle_model, :booking_date, :booking_time, :bundle_slug, :bundle_option, :status, :notes, CURRENT_TIMESTAMP)'
+    );
+    $insert->execute([
+        ':user_id' => $userId,
+        ':service_id' => $serviceId,
+        ':vehicle_model' => $vehicleModel,
+        ':booking_date' => $bookingDate,
+        ':booking_time' => $bookingTime,
+        ':bundle_slug' => $promoSlug !== '' ? $promoSlug : null,
+        ':bundle_option' => $promoOption !== '' ? $promoOption : null,
+        ':status' => 'Pending',
+        ':notes' => $notes !== '' ? $notes : null,
     ]);
 
-    // Clear any unintended output buffer content
-    ob_clean();
-
-    echo json_encode([
+    respond([
         'success' => true,
-        'message' => 'Service appointment booked successfully!',
-        'booking_reference' => $bookingReference,
-        'customer_name' => $fullName,
+        'message' => $promoSlug !== '' ? 'Promo booking submitted successfully.' : 'Service booking submitted successfully.',
+        'booking_id' => (int) $pdo->lastInsertId(),
+        'customer_name' => trim($user['first_name'] . ' ' . $user['last_name']),
         'service_name' => $service['name'],
-        'vehicle' => $vehicle,
         'booking_date' => $bookingDate,
         'booking_time' => $bookingTime,
-        'phone' => $contact,
-        'notes' => $notes
     ]);
-    exit;
-} catch (Throwable $e) {
-    // Clear buffer and return JSON error message safely
-    ob_clean();
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error: ' . $e->getMessage()
-    ]);
-    exit;
+} catch (Throwable $error) {
+    error_log('Booking submission failed: ' . $error->getMessage());
+    respond(['success' => false, 'message' => 'Unable to submit the booking right now. Please try again.'], 500);
 }

@@ -1,9 +1,7 @@
 <?php
 // get_claim.php - Fetches promo claim details
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo '<p style="color:#ff6b6b;">Unauthorized access. Please log in.</p>';
@@ -13,7 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 require_once 'includes/config.php';
 
 $userId = intval($_SESSION['user_id']);
-$isAdmin = $_SESSION['is_admin'] ?? false;
+$isAdmin = isAdmin($userId);
 
 $claimId = intval($_GET['id'] ?? 0);
 $mode = $_GET['mode'] ?? 'view';
@@ -27,22 +25,37 @@ try {
 
     $sql = "
         SELECT
-            pc.*,
-            u.first_name,
-            u.last_name,
+            sb.bookingId as id,
+            sb.bookingId,
+            sb.userId as user_id,
+            sb.serviceId as service_id,
+            sb.bookingVehicleModel as vehicle_model,
+            sb.bookingDate as booking_date,
+            sb.bookingDate as appointment_date,
+            sb.bookingTime as booking_time,
+            sb.bookingTime as appointment_time,
+            sb.bookingBundleSlug as bundle_slug,
+            sb.bookingBundleOption as bundle_option,
+            sb.bookingBundleOption as selected_option,
+            sb.bookingStatus as status,
+            sb.bookingNotes as notes,
+            sb.bookingCreatedAt as created_at,
+            CONCAT_WS(' ', u.userFirstName, u.userLastName) AS fullname,
+            u.userPhone as phone,
+            u.userFirstName as first_name,
+            u.userLastName as last_name,
             u.username,
-            u.phone AS registered_phone
-        FROM promo_claims pc
-        LEFT JOIN users u
-            ON pc.users_id = u.id
-        WHERE pc.id = ?
+            u.userPhone AS registered_phone
+        FROM service_booking sb
+        INNER JOIN user u ON sb.userId = u.userId
+        WHERE sb.bookingId = ? AND sb.bookingBundleSlug IS NOT NULL
     ";
 
     $params = [$claimId];
 
     if (!$isAdmin) {
 
-        $sql .= " AND pc.users_id = ?";
+        $sql .= " AND sb.userId = ?";
 
         $params[] = $userId;
     }
@@ -258,29 +271,29 @@ try {
         >
 
             <option
-                value="09:00 AM - 10:30 AM"
-                <?= $appointmentTime === '09:00 AM - 10:30 AM' ? 'selected' : '' ?>
+                value="09:00:00"
+                <?= $appointmentTime === '09:00:00' ? 'selected' : '' ?>
             >
                 09:00 AM - 10:30 AM
             </option>
 
             <option
-                value="10:30 AM - 12:00 PM"
-                <?= $appointmentTime === '10:30 AM - 12:00 PM' ? 'selected' : '' ?>
+                value="10:30:00"
+                <?= $appointmentTime === '10:30:00' ? 'selected' : '' ?>
             >
                 10:30 AM - 12:00 PM
             </option>
 
             <option
-                value="01:00 PM - 02:30 PM"
-                <?= $appointmentTime === '01:00 PM - 02:30 PM' ? 'selected' : '' ?>
+                value="13:00:00"
+                <?= $appointmentTime === '13:00:00' ? 'selected' : '' ?>
             >
                 01:00 PM - 02:30 PM
             </option>
 
             <option
-                value="04:00 PM - 05:30 PM"
-                <?= $appointmentTime === '04:00 PM - 05:30 PM' ? 'selected' : '' ?>
+                value="16:00:00"
+                <?= $appointmentTime === '16:00:00' ? 'selected' : '' ?>
             >
                 04:00 PM - 05:30 PM
             </option>

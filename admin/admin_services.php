@@ -1,6 +1,6 @@
 <?php
 // /admin/admin_services.php
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 require_once '../includes/config.php';
 /** @var PDO $pdo */
 require_once '../includes/auth.php';
@@ -15,11 +15,11 @@ $search = trim($_GET['search'] ?? '');
 $status_filter = $_GET['status'] ?? '';
 
 // Build query with search and status filters
-$query = "SELECT services.*, CASE WHEN active = 1 THEN 'Active' ELSE 'Inactive' END AS status FROM services WHERE 1=1";
+$query = "SELECT serviceId as id, serviceName as name, serviceDescription as description, servicePrice as price, serviceImage as image, serviceActive as active, serviceFeatured as featured, CASE WHEN serviceActive = 1 THEN 'Active' ELSE 'Inactive' END AS status, serviceId, serviceName, serviceDescription, servicePrice, serviceImage, serviceActive, serviceFeatured FROM service WHERE 1=1";
 $params = [];
 
 if (!empty($search)) {
-    $query .= " AND (id LIKE ? OR name LIKE ? OR description LIKE ?)";
+    $query .= " AND (serviceId LIKE ? OR serviceName LIKE ? OR serviceDescription LIKE ?)";
     $term = "%$search%";
     $params[] = $term;
     $params[] = $term;
@@ -27,7 +27,7 @@ if (!empty($search)) {
 }
 
 if (!empty($status_filter) && $status_filter !== 'all') {
-    $query .= " AND active = ?";
+    $query .= " AND serviceActive = ?";
     $params[] = $status_filter === 'Active' ? 1 : 0;
 }
 
@@ -63,10 +63,10 @@ if (isset($_GET['ajax'])) {
             echo '<td>₱' . number_format($s['price'] ?? 0, 2) . '</td>';
             echo '<td><span class="badge" style="padding: 4px 8px; border-radius: 4px; ' . $badgeStyle . '">' . htmlspecialchars($statusVal) . '</span></td>';
             echo '<td>';
-            echo '<div style="display: flex; gap: 6px; align-items: center;">';
-            echo '<button type="button" class="btn-sm btn-secondary btn-view-service" data-service=\'' . htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') . '\' title="View Service"><i class="fas fa-eye"></i></button>';
-            echo '<button type="button" class="btn-sm btn-info btn-edit-service" data-service=\'' . htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') . '\' title="Edit Service"><i class="fas fa-edit"></i></button>';
-            echo '<a href="actions/admin_service_delete.php?id=' . $s['id'] . '" class="btn-sm btn-danger" title="Delete Service" onclick="return confirm(\'Are you sure you want to delete this service?\');"><i class="fas fa-trash"></i></a>';
+            echo '<div class="table-row-actions">';
+            echo '<button type="button" class="btn-sm btn-secondary btn-view-service" data-service=\'' . htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') . '\' title="View Service"><i class="fas fa-eye"></i> View</button>';
+            echo '<button type="button" class="btn-sm btn-info btn-edit-service" data-service=\'' . htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') . '\' title="Edit Service"><i class="fas fa-edit"></i> Edit</button>';
+            echo '<form method="POST" action="actions/admin_service_delete.php" style="display:inline" onsubmit="return confirm(\'Are you sure you want to delete this service?\');"><input type="hidden" name="csrf_token" value="' . htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="id" value="' . (int) $s['id'] . '"><button type="submit" class="btn-sm btn-danger" title="Delete Service"><i class="fas fa-trash"></i> Delete</button></form>';
             echo '</div>';
             echo '</td>';
             echo '</tr>';
@@ -173,10 +173,14 @@ if (isset($_GET['ajax'])) {
                                             </span>
                                         </td>
                                         <td>
-                                            <div style="display: flex; gap: 6px; align-items: center;">
-                                                <button type="button" class="btn-sm btn-secondary btn-view-service" data-service='<?= htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') ?>' title="View Service"><i class="fas fa-eye"></i></button>
-                                                <button type="button" class="btn-sm btn-info btn-edit-service" data-service='<?= htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') ?>' title="Edit Service"><i class="fas fa-edit"></i></button>
-                                                <a href="actions/admin_service_delete.php?id=<?= $s['id'] ?>" class="btn-sm btn-danger" title="Delete Service" onclick="return confirm('Are you sure you want to delete this service?');"><i class="fas fa-trash"></i></a>
+                                            <div class="table-row-actions">
+                                                <button type="button" class="btn-sm btn-secondary btn-view-service" data-service='<?= htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') ?>' title="View Service"><i class="fas fa-eye"></i> View</button>
+                                                <button type="button" class="btn-sm btn-info btn-edit-service" data-service='<?= htmlspecialchars(json_encode($s), ENT_QUOTES, 'UTF-8') ?>' title="Edit Service"><i class="fas fa-edit"></i> Edit</button>
+                                                <form method="POST" action="actions/admin_service_delete.php" style="display:inline" onsubmit="return confirm('Are you sure you want to delete this service?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
+                                                    <button type="submit" class="btn-sm btn-danger" title="Delete Service"><i class="fas fa-trash"></i> Delete</button>
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>

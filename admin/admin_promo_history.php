@@ -1,6 +1,6 @@
 <?php
 // /admin/admin_promo_history.php
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 require_once '../includes/config.php';
 /** @var PDO $pdo */
 require_once '../includes/auth.php';
@@ -11,10 +11,10 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 }
 
 // Fetch all records for fast, responsive client-side live search and filtering
-$query = "SELECT pc.*, u.username as user_username 
-          FROM promo_claims pc 
-          LEFT JOIN users u ON pc.users_id = u.id
-          ORDER BY pc.id DESC";
+$query = "SELECT pc.claimId as id, pc.userId as users_id, pc.claimFullName as fullname, pc.claimPhone as phone, pc.claimBundleSlug as bundle_slug, pc.claimSelectedOption as selected_option, pc.claimAppointmentDate as appointment_date, pc.claimAppointmentTime as appointment_time, pc.claimStatus as status, pc.claimCreatedAt as created_at, u.username as user_username
+          FROM promo_claim pc
+          LEFT JOIN user u ON pc.userId = u.userId
+          ORDER BY pc.claimId DESC";
 $stmt = $pdo->prepare($query);
 $stmt->execute();
 $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -26,7 +26,7 @@ $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Promo & Appointment History</title>
+    <title>Admin - Promo Claim History</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="css/admin_layout.css">
     <link rel="stylesheet" href="css/admin_products.css">
@@ -51,7 +51,7 @@ $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <!-- MAIN CONTENT AREA -->
         <main class="admin-main">
             <header class="main-header">
-                <h2>Promo & Appointment History</h2>
+                <h2>Promo Claim History</h2>
             </header>
 
             <div class="admin-content-body">
@@ -87,7 +87,7 @@ $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <tbody>
                             <?php if (empty($promoHistory)): ?>
                                 <tr id="noRecordsRow">
-                                    <td colspan="6" class="text-center" style="padding: 30px; color: #64748b;">No promo history or appointment records found.</td>
+                                    <td colspan="6" class="text-center" style="padding: 30px; color: #64748b;">No promo claims found.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($promoHistory as $row): ?>
@@ -130,12 +130,16 @@ $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <?= htmlspecialchars($status) ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <button class="btn-sm btn-secondary" title="View Details" onclick="openViewModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-eye"></i></button>
-                                            <?php if (strtoupper($status) !== 'COMPLETED'): ?>
-                                                <button class="btn-sm btn-primary" title="Edit Record" onclick="openEditModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-edit"></i></button>
+                                        <td class="table-row-actions">
+                                            <button class="btn-sm btn-secondary" title="View Details" onclick="openViewModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-eye"></i> View</button>
+                                            <?php if (strtoupper(trim((string) $status)) !== 'COMPLETED'): ?>
+                                                <button class="btn-sm btn-primary" title="Edit Record" onclick="openEditModal(<?= htmlspecialchars(json_encode($row, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"><i class="fas fa-edit"></i> Edit</button>
                                             <?php endif; ?>
-                                            <a href="actions/admin_promo_history_delete.php?id=<?= $row['id'] ?>" class="btn-sm btn-danger" title="Delete Record" onclick="return confirm('Are you sure you want to delete this promo claim record?');"><i class="fas fa-trash"></i></a>
+                                            <form method="POST" action="actions/admin_promo_history_delete.php" style="display:inline" onsubmit="return confirm('Delete this promo claim record? This cannot be undone.');">
+                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="id" value="<?= (int) $row['id'] ?>">
+                                                <button type="submit" class="btn-sm btn-danger" title="Delete Record"><i class="fas fa-trash"></i> Delete</button>
+                                            </form>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -190,6 +194,7 @@ $promoHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="modal-overlay" id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
         <div class="modal-content" style="background: #fff; padding: 30px; border-radius: 8px; width: 400px; max-width: 90%;">
             <form action="actions/admin_promo_history_update.php" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
                 <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3>Edit Promo Claim Status</h3>
                     <button type="button" onclick="closeModal('editModal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>

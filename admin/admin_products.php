@@ -1,6 +1,6 @@
 <?php
 // /admin/admin_products.php
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 require_once '../includes/config.php';
 /** @var PDO $pdo */
 require_once '../includes/auth.php';
@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 }
 
 // Fetch all products ordered by ID in ascending order
-$stmt = $pdo->query("SELECT id, name, price, image, active, stock FROM products ORDER BY id ASC");
+$stmt = $pdo->query("SELECT productId as id, productName as name, productPrice as price, productImage as image, productActive as active, productStock as stock, productId, productName, productPrice, productImage, productActive, productStock FROM product ORDER BY productId ASC");
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -96,10 +96,14 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <?= intval($p['stock'] ?? 0) ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <button class="btn-sm btn-secondary" onclick="openViewModal(<?= htmlspecialchars(json_encode($p)) ?>)" title="View"><i class="fas fa-eye"></i></button>
-                                            <button class="btn-sm btn-info" onclick="openEditModal(<?= htmlspecialchars(json_encode($p)) ?>)" title="Edit"><i class="fas fa-edit"></i></button>
-                                            <a href="actions/admin_product_delete.php?id=<?= $p['id'] ?>" class="btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this product?');" title="Delete"><i class="fas fa-trash"></i></a>
+                                        <td class="table-row-actions">
+                                            <button class="btn-sm btn-secondary" onclick="openViewModal(<?= htmlspecialchars(json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)" title="View"><i class="fas fa-eye"></i> View</button>
+                                            <button class="btn-sm btn-info" onclick="openEditModal(<?= htmlspecialchars(json_encode($p, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)" title="Edit"><i class="fas fa-edit"></i> Edit</button>
+                                            <form method="POST" action="actions/admin_product_delete.php" style="display:inline" onsubmit="return confirm('Delete this product? Order history is retained; products with orders are deactivated.');">
+                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                                                <button type="submit" class="btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i> Delete</button>
+                                            </form>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

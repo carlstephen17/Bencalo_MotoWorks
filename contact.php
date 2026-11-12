@@ -1,13 +1,9 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/image_upload.php';
+generateCSRFToken();
 
 // Generate CSRF Token for security
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 $configFile = __DIR__ . '/includes/config.php';
 if (file_exists($configFile)) {
     require_once $configFile;
@@ -20,53 +16,40 @@ $user_email = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validate CSRF token
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
         $error_message = 'Invalid security token. Please refresh and try again.';
     } else {
-        $user_name = trim($_POST['name'] ?? '');
-        $user_email = trim($_POST['email'] ?? '');
-        $subject = trim($_POST['subject'] ?? '');
-        $message = trim($_POST['message'] ?? '');
-        $imagePath = '';
+        $user_name = trim((string) ($_POST['name'] ?? ''));
+        $user_email = trim((string) ($_POST['email'] ?? ''));
+        $subject = trim((string) ($_POST['subject'] ?? ''));
+        $message = trim((string) ($_POST['message'] ?? ''));
+        $imagePath = null;
 
-        if (empty($user_name) || empty($user_email) || empty($message)) {
+        if ($user_name === '' || !filter_var($user_email, FILTER_VALIDATE_EMAIL) || $message === '' || mb_strlen($user_name) > 255 || mb_strlen($user_email) > 100 || mb_strlen($subject) > 255 || mb_strlen($message) > 10000) {
             $error_message = 'Please fill in all required fields.';
         } else {
-            // Handle optional image upload
-            if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-                $fileTmpPath = $_FILES['image']['tmp_name'];
-                $fileName = $_FILES['image']['name'];
-                $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-
-                $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-                if (in_array($fileExtension, $allowedExtensions)) {
-                    $uploadDir = __DIR__ . '/images/testimonials/';
-                    if (!is_dir($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
-                    }
-
-                    $newFileName = 'testimonial_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $fileExtension;
-                    $destPath = $uploadDir . $newFileName;
-
-                    if (move_uploaded_file($fileTmpPath, $destPath)) {
-                        // Store relative path for database storage and display
-                        $imagePath = 'images/testimonials/' . $newFileName;
-                    }
-                }
+            try {
+                $imagePath = saveSiteImageUpload($_FILES['image'] ?? [], 'testimonials');
+            } catch (RuntimeException $error) {
+                $error_message = $error->getMessage();
             }
 
             // Save to Database
-            if (isset($pdo)) {
+            if ($error_message === '' && isset($pdo)) {
                 try {
-                    $stmt = $pdo->prepare("INSERT INTO testimonials (name, email, subject, message, image, status, created_at) VALUES (?, ?, ?, ?, ?, 'approved', NOW())");
+                    $stmt = $pdo->prepare("INSERT INTO testimonial (testimonialName, testimonialEmail, testimonialSubject, testimonialMessage, testimonialImage, testimonialStatus, testimonialCreatedAt) VALUES (?, ?, ?, ?, ?, 'approved', NOW())");
                     $stmt->execute([$user_name, $user_email, $subject, $message, $imagePath]);
 
                     $success_message = 'Thank you! Your message and review have been submitted successfully.';
                     // Clear inputs on success
                     $user_name = '';
                     $user_email = '';
-                } catch (Exception $e) {
-                    $error_message = 'Database error: ' . $e->getMessage();
+                } catch (PDOException $e) {
+                    if ($imagePath !== null && !removeSiteTestimonialUpload($imagePath)) {
+                        error_log('Unable to remove uploaded testimonial image after save failure: ' . $imagePath);
+                    }
+                    error_log('Contact form submission failed: ' . $e->getMessage());
+                    $error_message = 'Unable to save your message right now. Please try again.';
                 }
             } else {
                 $error_message = 'Database connection not available.';

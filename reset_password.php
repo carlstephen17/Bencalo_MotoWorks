@@ -1,34 +1,40 @@
 <?php
+require_once __DIR__ . '/includes/auth.php';
 require_once 'includes/config.php';
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+generateCSRFToken();
 
 $message = '';
 $status = '';
 $validToken = false;
 $token = $_GET['token'] ?? '';
+if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+    $token = '';
+}
 
 if (!empty($token)) {
-    // Check if token exists and is not expired
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_expiry > NOW()");
-    $stmt->execute([$token]);
+    $stmt = $pdo->prepare('SELECT userId FROM `user` WHERE userResetToken = ? AND userResetExpiry > NOW()');
+    $stmt->execute([hash('sha256', $token)]);
     $user = $stmt->fetch();
 
     if ($user) {
         $validToken = true;
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+                http_response_code(403);
+                $message = 'Invalid security token. Refresh the page and try again.';
+                $status = 'error';
+            } else {
             $newPassword = $_POST['password'] ?? '';
             $confirmPassword = $_POST['confirm_password'] ?? '';
 
             if (!empty($newPassword) && !empty($confirmPassword)) {
                 if ($newPassword === $confirmPassword) {
-                    if (strlen($newPassword) >= 6) {
+                    if (strlen($newPassword) >= 8) {
                         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
 
-                        $updateStmt = $pdo->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_expiry = NULL WHERE id = ?");
-                        if ($updateStmt->execute([$hashedPassword, $user['id']])) {
+                        $updateStmt = $pdo->prepare('UPDATE `user` SET userPassword = ?, userResetToken = NULL, userResetExpiry = NULL WHERE userId = ? AND userResetToken = ? AND userResetExpiry > NOW()');
+                        if ($updateStmt->execute([$hashedPassword, $user['userId'], hash('sha256', $token)]) && $updateStmt->rowCount() > 0) {
                             $message = "Your password has been successfully reset! You can now log in.";
                             $status = "success";
                             $validToken = false;
@@ -37,7 +43,7 @@ if (!empty($token)) {
                             $status = "error";
                         }
                     } else {
-                        $message = "Password must be at least 6 characters long.";
+                        $message = "Password must be at least 8 characters long.";
                         $status = "error";
                     }
                 } else {
@@ -47,6 +53,7 @@ if (!empty($token)) {
             } else {
                 $message = "Please fill in all fields.";
                 $status = "error";
+            }
             }
         }
     } else {
@@ -82,6 +89,7 @@ if (!empty($token)) {
 
         <?php if ($validToken): ?>
             <form action="" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
                 <div style="margin-bottom: 15px;">
                     <input type="password" name="password" placeholder="New Password" required style="width:100%; padding:12px; background:var(--color-bg); border:1px solid var(--color-primary); color:var(--color-text); border-radius:var(--radius-sm);">
                 </div>

@@ -1,7 +1,5 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 // Generate CSRF Token for security
 if (empty($_SESSION['csrf_token'])) {
@@ -16,7 +14,7 @@ if (file_exists($configFile)) {
 // Auto-login via Remember Me Cookie
 if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token']) && isset($pdo)) {
     $token = $_COOKIE['remember_token'];
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE remember_token = ?");
+    $stmt = $pdo->prepare("SELECT userId as id, username, userFirstName as first_name, userRole as role FROM `user` WHERE userRememberToken = ?");
     $stmt->execute([$token]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -32,7 +30,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token']) && isset($
 $user_phone = '';
 if (isset($_SESSION['user_id']) && isset($pdo)) {
     try {
-        $stmt = $pdo->prepare("SELECT phone FROM users WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT userPhone as phone FROM `user` WHERE userId = ?");
         $stmt->execute([$_SESSION['user_id']]);
         $userData = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($userData && !empty($userData['phone'])) {
@@ -51,112 +49,45 @@ if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
     }
 }
 
-// Fetch Products from Database or Fallback
-$products = [];
-if (isset($pdo)) {
-    try {
-        $stmt = $pdo->query("SELECT * FROM products WHERE active = 1 LIMIT 8");
-        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        // Database query failed, fallback used below
-    }
-}
-
-if (empty($products)) {
-    $products = [
-        ["id" => 1, "name" => "GIVI HPS 50.6 Stuttgart Solid Black Medium (H506FSBK)", "price" => 250.00, "image" => "images/featured_products/helmet.png", "featured" => false],
-        ["id" => 2, "name" => "MOTUL 300V 4T Factory Line 10W40 1L", "price" => 320.00, "image" => "images/featured_products/synthetic_oil.png", "featured" => false],
-        ["id" => 3, "name" => "KOSO Side Mirror", "price" => 320.00, "image" => "images/featured_products/h3420_side_mirror.png", "featured" => false],
-        ["id" => 4, "name" => "Michelin Pilot Sport 4 225/40 ZR18 92Y XL", "price" => 325.00, "image" => "images/featured_products/tire.webp", "featured" => false]
-    ];
-}
-
-// Fetch Services from Database or Fallback
-$services = [];
-if (isset($pdo)) {
-    try {
-        $stmt = $pdo->query("SELECT * FROM services WHERE active = 1 LIMIT 4");
-        $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        // Fallback used below
-    }
-}
-
-if (empty($services)) {
-    $services = [
-        ["id" => 1, "name" => "Premium Oil & Change Service", "desc" => "Full synthetic oil, new filter, comprehensive check-up.", "icon" => "images/featured_services/premium_oil_and_change_service.png"],
-        ["id" => 2, "name" => "Wheel & Tire Service", "desc" => "Mounting, precision balancing, and pressure check.", "icon" => "images/featured_services/wheel_and_tire_service.png"],
-        ["id" => 3, "name" => "Vehicle Washing Service", "desc" => "Complete exterior wash, foam bath, wheel cleaning, and wax finishing.", "icon" => "images/featured_services/vehicle_washing_service.png"],
-        ["id" => 4, "name" => "Battery Service", "desc" => "Battery inspection, voltage testing, terminal cleaning, and battery replacement.", "icon" => "images/featured_services/battery_service.png"]
-    ];
-}
-
-// Base Default Testimonials
-$default_testimonials = [
-    [
-        "name" => "Robert Smith",
-        "location" => "Washington, D.C.",
-        "message" => "Great service every time! Friendly and the mechanics always explain what they are doing. Trustworthy and reliable.",
-        "image" => ""
-    ],
-    [
-        "name" => "Emily Johnson",
-        "location" => "San Francisco, California",
-        "message" => "Saved me a lot of trouble! They diagnosed an engine issue that another shop couldn't fix. Excellent technical knowledge.",
-        "image" => ""
-    ],
-    [
-        "name" => "Alice Johnson",
-        "location" => "Los Angeles, California",
-        "message" => "Bencalo Motoworks is my go-to place for maintenance. They always use quality parts, and my car runs like a dream. Highly recommended!",
-        "image" => ""
-    ],
-    [
-        "name" => "John Doe",
-        "location" => "Washington, D.C.",
-        "message" => "Ordering parts through their website was seamless, and the delivery was quick. The parts are exact and exactly what I needed.",
-        "image" => ""
-    ]
-];
-
 // Fetch Latest Approved Testimonials from Database
 $db_testimonials = [];
 if (isset($pdo)) {
     try {
         // Check if the image column exists by attempting to select it
-        $stmt = $pdo->prepare("SELECT name, subject, message, created_at, image FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 4");
+        $stmt = $pdo->prepare("SELECT testimonialName as name, testimonialSubject as subject, testimonialMessage as message, testimonialCreatedAt as created_at, testimonialImage as image, testimonialName, testimonialSubject, testimonialMessage, testimonialCreatedAt, testimonialImage FROM testimonial WHERE testimonialStatus = 'approved' ORDER BY testimonialCreatedAt DESC LIMIT 4");
         $stmt->execute();
         $db_testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
-        // Fallback if the image column hasn't been added to your database table yet
+        // Older databases may not include the optional image column.
         try {
-            $stmt = $pdo->prepare("SELECT name, subject, message, created_at FROM testimonials WHERE status = 'approved' ORDER BY created_at DESC LIMIT 4");
+            $stmt = $pdo->prepare("SELECT testimonialName as name, testimonialSubject as subject, testimonialMessage as message, testimonialCreatedAt as created_at FROM testimonial WHERE testimonialStatus = 'approved' ORDER BY testimonialCreatedAt DESC LIMIT 4");
             $stmt->execute();
             $db_testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $ex) {
-            // Fallback silently
+            error_log('Unable to load testimonials: ' . $ex->getMessage());
         }
     }
 }
 
-// Overlay new messages sequentially onto the static slots (1st message -> slot 0, 2nd -> slot 1, etc.)
-$testimonials_to_display = $default_testimonials;
-foreach ($db_testimonials as $index => $db_t) {
-    if (isset($testimonials_to_display[$index])) {
-        $subject = trim($db_t['subject'] ?? '');
-        $message = $db_t['message'] ?? '';
-        if ($subject === '' && preg_match('/^Subject:\s*(.*?)\R\R(.*)$/s', $message, $matches)) {
-            $subject = trim($matches[1]);
-            $message = $matches[2];
-        }
-        $testimonials_to_display[$index] = [
-            "name" => $db_t['name'],
-            "location" => "Contact Page Review",
-            "subject" => $subject,
-            "message" => $message,
-            "image" => !empty($db_t['image']) ? $db_t['image'] : ''
-        ];
+if (!isset($db_testimonials)) {
+    $db_testimonials = [];
+}
+
+$testimonials_to_display = [];
+foreach ($db_testimonials as $dbTestimonial) {
+    $subject = trim($dbTestimonial['subject'] ?? '');
+    $message = $dbTestimonial['message'] ?? '';
+    if ($subject === '' && preg_match('/^Subject:\s*(.*?)\R\R(.*)$/s', $message, $matches)) {
+        $subject = trim($matches[1]);
+        $message = $matches[2];
     }
+    $testimonials_to_display[] = [
+        'name' => $dbTestimonial['name'] ?? '',
+        'location' => 'Contact Page Review',
+        'subject' => $subject,
+        'message' => $message,
+        'image' => $dbTestimonial['image'] ?? ''
+    ];
 }
 ?>
 <!DOCTYPE html>
@@ -234,13 +165,6 @@ foreach ($db_testimonials as $index => $db_t) {
                                     <h4 style="font-size: 1rem; font-weight: 700; color: #fff; margin: 0 0 2px 0;"><?= htmlspecialchars($t['name']) ?></h4>
                                     <span style="font-size: 0.8rem; color: var(--color-text-muted, #a0a0a0);"><?= htmlspecialchars($t['location']) ?></span>
                                 </div>
-                            </div>
-                            <div style="color: #00bcd4; margin-bottom: 15px; font-size: 0.9rem;">
-                                <i class="fa-solid fa-star"></i>
-                                <i class="fa-solid fa-star"></i>
-                                <i class="fa-solid fa-star"></i>
-                                <i class="fa-solid fa-star"></i>
-                                <i class="fa-solid fa-star"></i>
                             </div>
                             <?php if (!empty($t['subject'])): ?>
                                 <div style="font-size: 0.9rem; line-height: 1.5; color: #fff; font-weight: 600; margin-bottom: 8px;">Subject: <?= htmlspecialchars($t['subject']) ?></div>

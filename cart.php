@@ -3,19 +3,14 @@
 // CART PAGE
 // =====================================================
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once 'includes/config.php';
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/config.php';
 
 // =====================================================
 // CSRF TOKEN
 // =====================================================
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
+generateCSRFToken();
 
 // =====================================================
 // CHECKOUT SUCCESS / ERROR MESSAGE
@@ -45,10 +40,7 @@ if (isset($_SESSION['user_id']) && isset($pdo)) {
     try {
 
         $stmt = $pdo->prepare("
-            SELECT first_name, last_name, phone
-            FROM users
-            WHERE id = ?
-            LIMIT 1
+            SELECT userFirstName as first_name, userLastName as last_name, userPhone as phone FROM `user` WHERE userId = ? LIMIT 1
         ");
 
         $stmt->execute([
@@ -79,43 +71,47 @@ if (isset($_SESSION['user_id']) && isset($pdo)) {
 // HANDLE CART ACTIONS
 // =====================================================
 
-if (isset($_GET['action'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        exit('Invalid security token. Refresh the page and try again.');
+    }
 
-    $action = $_GET['action'];
-
-    $id = isset($_GET['id'])
-        ? (int)$_GET['id']
-        : 0;
+    $action = $_POST['action'];
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
     if (
+        $id &&
         $action === 'remove' &&
         isset($_SESSION['cart'][$id])
     ) {
-
         unset($_SESSION['cart'][$id]);
-
     } elseif (
+        $id &&
         $action === 'update' &&
         isset($_SESSION['cart'][$id])
     ) {
+        $qty = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
+        $productStmt = $pdo->prepare('SELECT productStock, productActive FROM product WHERE productId = ?');
+        $productStmt->execute([$id]);
+        $product = $productStmt->fetch(PDO::FETCH_ASSOC);
 
-        $qty = isset($_GET['qty'])
-            ? (int)$_GET['qty']
-            : 1;
-
-        if ($qty > 0) {
-
-            $_SESSION['cart'][$id]['quantity'] = $qty;
-
-        } else {
-
+        if (!$product || (int) $product['productActive'] !== 1) {
             unset($_SESSION['cart'][$id]);
+            $_SESSION['cart_error'] = 'This product is no longer available and was removed from your cart.';
+        } elseif ($qty === false || $qty === null || $qty < 1 || $qty > (int) $product['productStock']) {
+            $_SESSION['cart_error'] = 'The requested quantity is invalid or exceeds available stock.';
+        } else {
+            $_SESSION['cart'][$id] = ['quantity' => $qty];
         }
     }
 
     header('Location: cart.php');
     exit;
 }
+
+$cartError = $_SESSION['cart_error'] ?? '';
+unset($_SESSION['cart_error']);
 
 // =====================================================
 // LOAD CART ITEMS
@@ -144,10 +140,7 @@ if (
         }
 
         $stmt = $pdo->prepare("
-            SELECT *
-            FROM products
-            WHERE id = ?
-            LIMIT 1
+            SELECT productId as id, productName as name, productPrice as price, productStock as stock, productImage as image, productActive as active, productId, productName, productPrice, productStock, productImage, productActive FROM product WHERE productId = ? LIMIT 1
         ");
 
         $stmt->execute([
@@ -1135,6 +1128,9 @@ if (
             Your Shopping Cart
         </h2>
 
+        <?php if ($cartError !== ''): ?>
+            <p class="alert alert-danger" role="alert"><?= htmlspecialchars($cartError, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
 
         <?php if (empty($cart_items)): ?>
 
@@ -1239,19 +1235,20 @@ if (
                                 <!-- QUANTITY -->
 
                                 <td>
-
-                                    <input
-                                        type="number"
-                                        class="qty-input"
-                                        value="<?= $item['quantity'] ?>"
-                                        min="1"
-                                        max="<?= $item['stock'] ?>"
-                                        onchange="updateQuantity(
-                                            <?= $item['id'] ?>,
-                                            this.value
-                                        )"
-                                    >
-
+                                    <form method="POST" action="cart.php">
+                                        <input type="hidden" name="action" value="update">
+                                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input
+                                            type="number"
+                                            name="quantity"
+                                            class="qty-input"
+                                            value="<?= (int) $item['quantity'] ?>"
+                                            min="1"
+                                            max="<?= (int) $item['stock'] ?>"
+                                            onchange="this.form.submit()"
+                                        >
+                                    </form>
                                 </td>
 
 
@@ -1270,22 +1267,12 @@ if (
                                 <!-- REMOVE -->
 
                                 <td>
-
-                                    <a
-                                        href="cart.php?action=remove&id=<?= $item['id'] ?>"
-                                        class="btn-remove"
-                                        title="Remove item"
-                                        onclick="return confirm(
-                                            'Remove this product from your cart?'
-                                        );"
-                                    >
-
-                                        <i
-                                            class="fa-solid fa-trash"
-                                        ></i>
-
-                                    </a>
-
+                                    <form method="POST" action="cart.php" onsubmit="return confirm('Remove this product from your cart?');">
+                                        <input type="hidden" name="action" value="remove">
+                                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <button type="submit" class="btn-remove" title="Remove item"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
                                 </td>
 
                             </tr>
@@ -1610,29 +1597,6 @@ if (
     <!-- JAVASCRIPT -->
 
     <script>
-
-        // =====================================================
-        // UPDATE QUANTITY
-        // =====================================================
-
-        function updateQuantity(
-            productId,
-            newQty
-        ) {
-
-            newQty = parseInt(newQty);
-
-            if (
-                newQty < 1 ||
-                isNaN(newQty)
-            ) {
-                return;
-            }
-
-            window.location.href =
-                `cart.php?action=update&id=${productId}&qty=${newQty}`;
-        }
-
 
         // =====================================================
         // OPEN CHECKOUT MODAL

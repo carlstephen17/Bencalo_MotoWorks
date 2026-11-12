@@ -3,29 +3,13 @@
 $services = [];
 if (isset($pdo)) {
     try {
-        $stmt = $pdo->query("SELECT * FROM services WHERE active = 1 LIMIT 4");
+        $stmt = $pdo->query("SELECT serviceId as id, serviceName as name, serviceDescription as description, servicePrice as price, serviceImage as image, serviceActive as active, serviceFeatured as featured, serviceId, serviceName, serviceDescription, servicePrice, serviceImage, serviceActive, serviceFeatured FROM service WHERE serviceActive = 1 LIMIT 4");
         $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
-        // Fallback handled below
+        error_log('Unable to load featured services: ' . $e->getMessage());
     }
 }
 
-// Fallback image mapping matching service IDs when database values are missing
-$default_images = [
-    1 => 'images/featured_services/premium_oil_and_change_service.png',
-    2 => 'images/featured_services/battery_service.png',
-    3 => 'images/featured_services/wheel_and_tire_service.png',
-    4 => 'images/featured_services/vehicle_washing_service.png'
-];
-
-if (empty($services)) {
-    $services = [
-        ["id" => 1, "name" => "Premium Oil & Change Service", "desc" => "Full synthetic oil, new filter, comprehensive check-up.", "icon" => "images/featured_services/premium_oil_and_change_service.png"],
-        ["id" => 2, "name" => "Wheel & Tire Service", "desc" => "Mounting, precision balancing, and pressure check.", "icon" => "images/featured_services/wheel_and_tire_service.png"],
-        ["id" => 3, "name" => "Vehicle Washing Service", "desc" => "Complete exterior wash, foam bath, wheel cleaning, and wax finishing.", "icon" => "images/featured_services/vehicle_washing_service.png"],
-        ["id" => 4, "name" => "Battery Service", "desc" => "Battery inspection, voltage testing, terminal cleaning, and battery replacement.", "icon" => "images/featured_services/battery_service.png"]
-    ];
-}
 ?>
 
 <!-- ==================== FEATURED SERVICES SECTION ==================== -->
@@ -34,19 +18,16 @@ if (empty($services)) {
         <h2>Featured Services</h2>
     </div>
 
+    <?php if (!empty($services)): ?>
     <div class="card-grid service-grid" id="service-grid-container">
         <?php foreach ($services as $index => $s):
             $id = $s['service_id'] ?? $s['id'] ?? ($index + 1);
             $name = $s['service_name'] ?? $s['name'] ?? 'Service';
             $desc = $s['description'] ?? $s['service_description'] ?? $s['desc'] ?? '';
-            
-            // Get raw image path from DB column, check multiple possible keys
             $raw_icon = $s['image_url'] ?? $s['image'] ?? $s['icon'] ?? $s['icon_path'] ?? '';
-
-            if (!empty($raw_icon)) {
-                $image = ltrim(str_replace('../', '', $raw_icon), '/');
-            } else {
-                $image = $default_images[$id] ?? $default_images[$index + 1] ?? 'images/featured_services/premium_oil_and_change_service.png';
+            $image = ltrim(str_replace(['\\', '../'], ['/', ''], (string) $raw_icon), '/');
+            if ($image !== '' && !is_file(__DIR__ . '/../' . $image)) {
+                $image = '';
             }
 
             $serviceJson = htmlspecialchars(json_encode([
@@ -58,7 +39,11 @@ if (empty($services)) {
         ?>
             <div class="product-card service-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 25px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div class="product-image" style="margin-bottom: 15px; text-align: center; height: 140px; display: flex; align-items: center; justify-content: center;">
-                    <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($name) ?>" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                    <?php if ($image !== ''): ?>
+                        <img src="<?= htmlspecialchars($image, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                    <?php else: ?>
+                        <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true" style="font-size: 3rem; color: var(--color-text-muted, #a0a0a0);"></i>
+                    <?php endif; ?>
                 </div>
                 <h3 class="product-name" style="font-size: 18px; font-weight: 600; color: var(--text-main, #ffffff); margin-bottom: 10px;"><?= htmlspecialchars($name) ?></h3>
                 <?php if (!empty($desc)): ?>
@@ -71,6 +56,9 @@ if (empty($services)) {
             </div>
         <?php endforeach; ?>
     </div>
+    <?php else: ?>
+        <p class="text-center">No services are currently available.</p>
+    <?php endif; ?>
 </section>
 
 <!-- Service Details Modal Structure -->
@@ -104,7 +92,7 @@ if (empty($services)) {
         if (typeof openServiceBookingModal === 'function') {
             openServiceBookingModal(serviceId, serviceName);
         } else {
-            window.location.href = 'booking.php?service_id=' + serviceId;
+            window.location.href = 'services.php?service_id=' + encodeURIComponent(serviceId);
         }
     }
 

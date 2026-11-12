@@ -1,38 +1,48 @@
 <?php
 // /admin/actions/admin_service_create.php
-session_start();
-require_once '../../includes/config.php';
-/** @var PDO $pdo */
 require_once '../../includes/auth.php';
+require_once '../../includes/config.php';
+require_once '../includes/upload_helpers.php';
+/** @var PDO $pdo */
 
 if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     header('Location: ../../login.php');
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['csrf_token'] ?? '';
-    if (!verifyCSRFToken($token)) {
-        header('Location: ../admin_services.php?msg=Invalid+Security+Token');
-        exit();
-    }
-
-    $name = trim($_POST['name'] ?? '');
-    $description = trim($_POST['description'] ?? '');
-    $price = filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT);
-    $active = ($_POST['status'] ?? 'Active') === 'Inactive' ? 0 : 1;
-
-    if (!empty($name) && $price !== false && $price >= 0) {
-        $stmt = $pdo->prepare("INSERT INTO services (name, description, price, active) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$name, $description, $price, $active]);
-
-        header('Location: ../admin_services.php?msg=Service+successfully+created');
-        exit();
-    }
-
-    header('Location: ../admin_services.php?msg=Invalid+service+parameters');
-    exit();
-} else {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../admin_services.php');
     exit();
 }
+requireValidCSRFToken();
+
+$name = trim((string) ($_POST['name'] ?? ''));
+$description = trim((string) ($_POST['description'] ?? ''));
+$price = filter_var($_POST['price'] ?? null, FILTER_VALIDATE_FLOAT);
+$status = $_POST['status'] ?? 'Active';
+if ($name === '' || mb_strlen($name) > 255 || mb_strlen($description) > 65535 || $price === false || $price < 0 || !in_array($status, ['Active', 'Inactive'], true)) {
+    header('Location: ../admin_services.php?msg=' . urlencode('Please provide valid service details.'));
+    exit();
+}
+
+try {
+    $imagePath = saveAdminImageUpload($_FILES['image'] ?? []);
+} catch (RuntimeException $error) {
+    header('Location: ../admin_services.php?msg=' . urlencode($error->getMessage()));
+    exit();
+}
+
+try {
+    $stmt = $pdo->prepare('INSERT INTO service (serviceName, serviceDescription, servicePrice, serviceActive, serviceImage) VALUES (?, ?, ?, ?, ?)');
+    $stmt->execute([$name, $description, $price, $status === 'Active' ? 1 : 0, $imagePath]);
+} catch (PDOException $error) {
+    if ($imagePath !== null && !removeAdminImageUpload($imagePath)) {
+        error_log('Unable to remove image after service creation failed: ' . $imagePath);
+    }
+    error_log('Service creation failed: ' . $error->getMessage());
+    header('Location: ../admin_services.php?msg=' . urlencode('Unable to create service. Please try again.'));
+    exit();
+}
+
+header('Location: ../admin_services.php?msg=' . urlencode('Service successfully created.'));
+exit();

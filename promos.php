@@ -1,16 +1,22 @@
 <?php
 // promos.php - Updated user promo availment page with robust modal submission
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__ . '/includes/auth.php';
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 require_once 'includes/config.php';
+
+$bookingServices = $pdo->query(
+    "SELECT serviceId as id, serviceName as name, serviceId, serviceName FROM service WHERE serviceActive = 1 ORDER BY serviceName ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
 $userId = $_SESSION['user_id'] ?? null;
 
 $userData = [];
 if ($userId) {
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT userId as id, username, userFirstName as first_name, userLastName as last_name, userPhone as phone, userEmail as email, userId, username, userFirstName, userLastName, userPhone, userEmail FROM `user` WHERE userId = ?");
     $stmt->execute([$userId]);
     $userData = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 }
@@ -26,96 +32,27 @@ if ($userName === '') {
 
 $userPhone = $userData['phone'] ?? $userData['contact_number'] ?? '';
 
-$promos = [
-    [
-        'id' => 1,
-        'slug' => 'tire_service',
-        'title' => 'Tire + Mounting Service Bundle',
-        'badge' => '15% OFF',
-        'badge_class' => 'badge-pending',
-        'product_image' => 'images/featured_products/tire.webp',
-        'service_image' => 'images/featured_services/wheel_and_tire_service.png',
-        'product_icon' => 'fa-solid fa-circle-dot',
-        'service_icon' => 'fa-solid fa-screwdriver-wrench',
-        'description' => 'Purchase any eligible motorcycle tire and pair it with a professional mounting, balancing, and alignment service at the same time.',
-        'item_label' => 'Select Tire Model / Size',
-        'item_options' => [
-            'Michelin Pilot Street 2 (90/80-14 Tubeless)',
-            'Pirelli Diablo Rosso Sport (100/80-14 Tubeless)',
-            'IRC NR73 Tubeless Tire (80/90-17)'
-        ],
-        'perks' => [
-            'Eligible on all standard and tubeless tires',
-            'Includes labor and wheel balancing adjustment'
-        ]
-    ],
-    [
-        'id' => 2,
-        'slug' => 'oil_tuneup',
-        'title' => 'Synthetic Oil Change + Tune-Up',
-        'badge' => '20% OFF',
-        'badge_class' => 'badge-pending',
-        'product_image' => 'images/featured_products/synthetic_oil.png  ',
-        'service_image' => 'images/featured_services/premium_oil_and_change_service.png',
-        'product_icon' => 'fa-solid fa-oil-can',
-        'service_icon' => 'fa-solid fa-gauge-high',
-        'description' => 'Keep your engine running smoothly with high-grade synthetic oil paired with a complete carb/FI diagnostic tune-up service.',
-        'item_label' => 'Select Oil Viscosity & Type',
-        'item_options' => [
-            'Motul 7100 4T 10W-40 Synthetic (1L)',
-            'Shell Advance Ultra 10W-40 Fully Synthetic (1L)',
-            'Castrol Power1 Ultimate 10W-50 (1L)'
-        ],
-        'perks' => [
-            'Includes 1L high-performance synthetic oil',
-            'Full engine diagnostic & idle tuning'
-        ]
-    ],
-    [
-        'id' => 3,
-        'slug' => 'chain_sprocket',
-        'title' => 'Heavy Duty Chain Kit + Install',
-        'badge' => '10% OFF',
-        'badge_class' => 'badge-completed',
-        'product_image' => 'images/products/chain.png',
-        'service_image' => 'images/services/chain.png',
-        'product_icon' => 'fa-solid fa-link',
-        'service_icon' => 'fa-solid fa-gear',
-        'description' => 'Upgrade your drive train with a heavy-duty chain and sprocket set bundled together with precision professional installation.',
-        'item_label' => 'Select Chain & Sprocket Set',
-        'item_options' => [
-            'SSS Heavy Duty Chain & Sprocket Set (428H x 14T/38T)',
-            'DID O-Ring Heavy Duty Chain Combo (520V)',
-            'RK Racing Gold Chain & Steel Sprocket Kit'
-        ],
-        'perks' => [
-            'O-ring or X-ring heavy duty durability',
-            'Includes chain cleaning and tension adjustment'
-        ]
-    ],
-    [
-        'id' => 4,
-        'slug' => 'brake_overhaul',
-        'title' => 'Brake Pad Set + Fluid Bleeding',
-        'badge' => '15% OFF',
-        'badge_class' => 'badge-pending',
-        'product_image' => 'images/products/brake.png',
-        'service_image' => 'images/services/brake.png',
-        'product_icon' => 'fa-solid fa-compact-disc',
-        'service_icon' => 'fa-solid fa-droplet',
-        'description' => 'Ensure maximum stopping power by bundling front/rear ceramic brake pads with a complete hydraulic fluid flush and bleed service.',
-        'item_label' => 'Select Brake Pad Compound',
-        'item_options' => [
-            'Brembo Ceramic Front/Rear Brake Pads',
-            'EBC FA Series Sintered Brake Pads',
-            'Bendix Heavy Duty Street Moto Pads'
-        ],
-        'perks' => [
-            'High-friction ceramic compound pads',
-            'Complete DOT-4 brake fluid replacement'
-        ]
-    ],
-];
+$promoRows = $pdo->query(
+    'SELECT promoSlug AS slug, promoTitle AS title, promoBadge AS badge,
+            promoDescription AS description, promoItemLabel AS item_label,
+            promoItemOptions AS item_options, promoPerks AS perks,
+            promoProductImage AS product_image, promoServiceImage AS service_image,
+            promoProductIcon AS product_icon, promoServiceIcon AS service_icon
+     FROM promo
+     WHERE promoActive = 1
+     ORDER BY promoId ASC'
+)->fetchAll(PDO::FETCH_ASSOC);
+
+$promos = array_map(static function (array $promo): array {
+    $promo['badge_class'] = 'badge-pending';
+    $promo['item_options'] = array_values(array_filter(array_map('trim', preg_split('/\R/u', $promo['item_options']) ?: [])));
+    $promo['perks'] = array_values(array_filter(array_map('trim', preg_split('/\R/u', $promo['perks'] ?? '') ?: [])));
+    $promo['product_image'] = trim((string) ($promo['product_image'] ?? ''));
+    $promo['service_image'] = trim((string) ($promo['service_image'] ?? ''));
+    $promo['product_icon'] = trim((string) ($promo['product_icon'] ?? 'fa-solid fa-circle-dot'));
+    $promo['service_icon'] = trim((string) ($promo['service_icon'] ?? 'fa-solid fa-screwdriver-wrench'));
+    return $promo;
+}, $promoRows);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -199,16 +136,22 @@ $promos = [
         <div class="modal-content" style="background:#1e2124; padding:30px; border-radius:8px; width:450px; color:#fff; position:relative;">
             <h3 id="modalBundleTitle" style="margin-bottom: 15px; color:#00FFFF;">Avail Promo Bundle</h3>
             <form id="claimForm" onsubmit="submitClaim(event)">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" id="modalBundleSlug" name="bundle_slug">
                 
                 <div style="margin-bottom: 15px;">
-                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Full Name</label>
-                    <input type="text" name="fullname" value="<?= htmlspecialchars($userName) ?>" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Service</label>
+                    <select name="service_id" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                        <option value="">Select Service</option>
+                        <?php foreach ($bookingServices as $bookingService): ?>
+                            <option value="<?= (int) $bookingService['id'] ?>"><?= htmlspecialchars($bookingService['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
                 <div style="margin-bottom: 15px;">
-                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Contact Phone</label>
-                    <input type="tel" name="phone" value="<?= htmlspecialchars($userPhone, ENT_QUOTES, 'UTF-8') ?>" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Vehicle Model</label>
+                    <input type="text" name="vehicle_model" maxlength="255" required style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;">
                 </div>
 
                 <div style="margin-bottom: 15px;">
@@ -229,6 +172,11 @@ $promos = [
                         <option value="01:00 PM - 02:30 PM">01:00 PM - 02:30 PM</option>
                         <option value="04:00 PM - 05:30 PM">04:00 PM - 05:30 PM</option>
                     </select>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9rem;">Notes (optional)</label>
+                    <textarea name="notes" rows="3" style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></textarea>
                 </div>
 
                 <div style="display:flex; justify-content:flex-end; gap:10px;">
@@ -280,7 +228,7 @@ $promos = [
 
             const formData = new FormData(document.getElementById('claimForm'));
 
-            fetch('claim_promo.php', {
+            fetch('process_booking.php', {
                 method: 'POST',
                 body: formData
             })

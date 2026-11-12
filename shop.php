@@ -2,9 +2,7 @@
 
 require_once 'includes/config.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 
 // =====================================================
@@ -29,10 +27,7 @@ if (
     $token = $_COOKIE['remember_token'];
 
     $stmt = $pdo->prepare("
-        SELECT *
-        FROM users
-        WHERE remember_token = ?
-        LIMIT 1
+        SELECT userId as id, username, userFirstName as first_name, userRole as role FROM `user` WHERE userRememberToken = ? LIMIT 1
     ");
 
     $stmt->execute([$token]);
@@ -70,10 +65,7 @@ if (
     try {
 
         $stmt = $pdo->prepare("
-            SELECT phone
-            FROM users
-            WHERE id = ?
-            LIMIT 1
+            SELECT userPhone as phone FROM `user` WHERE userId = ? LIMIT 1
         ");
 
         $stmt->execute([
@@ -136,10 +128,7 @@ if (isset($pdo)) {
     try {
 
         $stmt = $pdo->query("
-            SELECT *
-            FROM products
-            WHERE active = 1
-            ORDER BY id ASC
+            SELECT productId as id, productName as name, productPrice as price, productStock as stock, productImage as image, productActive as active, productId, productName, productPrice, productStock, productImage, productActive FROM product WHERE productActive = 1 ORDER BY productId ASC
         ");
 
         $products =
@@ -147,8 +136,11 @@ if (isset($pdo)) {
 
     } catch (Exception $e) {
 
+        error_log('Unable to load shop products: ' . $e->getMessage());
         $products = [];
     }
+} else {
+    $products = [];
 }
 
 ?>
@@ -206,6 +198,11 @@ if (isset($pdo)) {
     <link
         rel="stylesheet"
         href="styles/index/modals.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="styles/services.css"
     >
 
     <link
@@ -440,12 +437,34 @@ if (isset($pdo)) {
                     );
 
 
-                $productImage =
-                    htmlspecialchars(
-                        $p['image'] ?? '',
-                        ENT_QUOTES,
-                        'UTF-8'
-                    );
+                $productImagePath = str_replace(
+                    '\\',
+                    '/',
+                    trim((string)($p['image'] ?? ''))
+                );
+
+                if (
+                    $productImagePath !== '' &&
+                    basename($productImagePath) === $productImagePath
+                ) {
+                    $productImagePath = 'uploads/' . $productImagePath;
+                }
+
+                $productImageFile = str_replace(
+                    '/',
+                    DIRECTORY_SEPARATOR,
+                    $productImagePath
+                );
+
+                if ($productImagePath === '' || !is_file(__DIR__ . DIRECTORY_SEPARATOR . $productImageFile)) {
+                    $productImagePath = '';
+                }
+
+                $productImage = htmlspecialchars(
+                    $productImagePath,
+                    ENT_QUOTES,
+                    'UTF-8'
+                );
 
                 ?>
 
@@ -469,12 +488,11 @@ if (isset($pdo)) {
                     <!-- IMAGE -->
 
                     <div class="product-image">
-
-                        <img
-                            src="<?= $productImage ?>"
-                            alt="<?= $productName ?>"
-                        >
-
+                        <?php if ($productImagePath !== ''): ?>
+                            <img src="<?= $productImage ?>" alt="<?= $productName ?>">
+                        <?php else: ?>
+                            <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                        <?php endif; ?>
                     </div>
 
 

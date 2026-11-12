@@ -4,9 +4,7 @@
 // PROCESS CHECKOUT
 // =====================================================
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 require_once 'includes/config.php';
 
@@ -139,15 +137,7 @@ if (!in_array($paymentMethod, ['Cash on Delivery', 'GCash', 'Card'], true)) {
 try {
 
     $userStmt = $pdo->prepare("
-        SELECT
-            id,
-            first_name,
-            last_name,
-            phone,
-            email
-        FROM users
-        WHERE id = ?
-        LIMIT 1
+        SELECT userId as id, userFirstName as first_name, userLastName as last_name, userPhone as phone, userEmail as email FROM `user` WHERE userId = ? LIMIT 1
     ");
 
     $userStmt->execute([
@@ -187,7 +177,7 @@ $fullName = trim(
 // =====================================================
 
 $phone =
-    trim($_POST['phone'] ?? ($user['phone'] ?? ''));
+    trim((string) ($user['phone'] ?? ''));
 
 
 // =====================================================
@@ -359,16 +349,33 @@ else {
 
 try {
 
-    $columnCheck = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_reference'");
+    $columnCheck = $pdo->query("SHOW COLUMNS FROM `order` LIKE 'orderPaymentReference'");
 
     if (!$columnCheck->fetch(PDO::FETCH_ASSOC)) {
         $pdo->exec(
-            "ALTER TABLE orders ADD payment_reference VARCHAR(32) NULL AFTER payment_method"
+            "ALTER TABLE `order` ADD orderPaymentReference VARCHAR(32) NULL AFTER orderPaymentMethod"
         );
     }
 
     $pdo->beginTransaction();
 
+    $addressStmt = $pdo->prepare('UPDATE `user` SET userAddress = ? WHERE userId = ?');
+    $addressStmt->execute([$address, $userId]);
+
+    $groupStmt = $pdo->prepare("
+        INSERT INTO customer_order
+            (userId, orderDeliveryAddress, orderPaymentMethod, orderPaymentReference,
+             orderPaymentStatus, orderStatus, orderCreatedAt)
+        VALUES (?, ?, ?, ?, ?, 'Pending', NOW())
+    ");
+    $groupStmt->execute([
+        $userId,
+        $address,
+        $paymentMethod,
+        $paymentReference,
+        $paymentMethod === 'Cash on Delivery' ? 'Due on delivery' : 'Unverified',
+    ]);
+    $orderGroupId = (int) $pdo->lastInsertId();
 
     $orderIds = [];
 
@@ -397,14 +404,7 @@ try {
 
         $productStmt =
             $pdo->prepare("
-                SELECT
-                    id,
-                    name,
-                    price,
-                    stock
-                FROM products
-                WHERE id = ?
-                FOR UPDATE
+                SELECT productId as id, productName as name, productPrice as price, productStock as stock FROM product WHERE productId = ? FOR UPDATE
             ");
 
         $productStmt->execute([
@@ -485,10 +485,7 @@ try {
 
         $stockStmt =
             $pdo->prepare("
-                UPDATE products
-                SET stock = stock - ?
-                WHERE id = ?
-                  AND stock >= ?
+                UPDATE product SET productStock = productStock - ? WHERE productId = ? AND productStock >= ?
             ");
 
         $stockStmt->execute([
@@ -520,47 +517,17 @@ try {
 
         $orderStmt =
             $pdo->prepare("
-                INSERT INTO orders
-                (
-                    users_id,
-                    products_id,
-                    quantity,
-                    total_amount,
-                    full_name,
-                    phone,
-                    address,
-                    payment_method,
-                    payment_reference,
-                    status,
-                    created_at,
-                    user_id,
-                    product_id
-                )
-                VALUES
-                (
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    NOW(),
-                    ?,
-                    ?
-                )
+                INSERT INTO `order`
+                    (userId, productId, orderQuantity, orderTotalAmount, orderPaymentMethod,
+                     orderPaymentReference, orderStatus, orderCreatedAt, orderGroupId, orderUnitPrice)
+                VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW(), ?, ?)
             ");
 
 
         $orderStmt->execute([
 
-            // users_id
             $userId,
 
-            // products_id
             $productId,
 
             // quantity
@@ -569,29 +536,15 @@ try {
             // total_amount
             $totalAmount,
 
-            // full_name
-            $fullName,
-
-            // phone
-            $phone,
-
-            // address
-            $address,
-
             // payment_method
             $paymentMethod,
 
             // payment_reference
             $paymentReference,
 
-            // status
-            'Pending',
+            $orderGroupId,
+            $price,
 
-            // user_id
-            $userId,
-
-            // product_id
-            $productId
         ]);
 
 

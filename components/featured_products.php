@@ -1,29 +1,26 @@
 <?php
 // components/featured_products.php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../includes/auth.php';
 
 require_once __DIR__ . '/../includes/config.php';
 
-$featured_products = [];
+$featured_products = $products ?? [];
 
 if (isset($pdo)) {
     try {
-        // Use the same active condition as the Shop page
         $stmt = $pdo->query("
-            SELECT *
-            FROM products
-            WHERE active = 1
-            ORDER BY id ASC
-            LIMIT 8
+            SELECT productId as id, productName as name, productPrice as price, productStock as stock, productImage as image, productActive as active, productId, productName, productPrice, productStock, productImage, productActive FROM product WHERE productActive = 1 ORDER BY productId ASC LIMIT 8
         ");
 
-        $featured_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $databaseProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($databaseProducts)) {
+            $featured_products = $databaseProducts;
+        }
 
     } catch (Exception $e) {
-        $featured_products = [];
+        error_log('Unable to load featured products: ' . $e->getMessage());
+        $featured_products = $products ?? [];
     }
 }
 ?>
@@ -39,7 +36,7 @@ if (isset($pdo)) {
 
         <div class="card-grid product-grid" id="featured-product-grid">
 
-            <?php foreach ($featured_products as $p): ?>
+            <?php foreach ($featured_products as $productIndex => $p): ?>
 
                 <?php
                 $productId = (int)$p['id'];
@@ -54,18 +51,25 @@ if (isset($pdo)) {
 
                 $description = $p['description'] ?? '';
 
-                $image = !empty($p['image'])
-                    ? $p['image']
-                    : 'images/products/default-product.png';
+                $image = trim((string) ($p['image'] ?? ''));
+                if ($image !== '' && basename(str_replace('\\', '/', $image)) === $image) {
+                    $image = 'uploads/' . $image;
+                }
+                $image = ltrim(str_replace(['\\', '../'], ['/', ''], $image), '/');
+                if ($image === '' || !is_file(__DIR__ . '/../' . $image)) {
+                    $image = '';
+                }
 
                 /*
                  * Detect the stock column used by your products table.
                  */
                 $stockLevel = 0;
+                $stockKnown = false;
 
                 foreach (['stock_level', 'stock', 'quantity', 'qty'] as $col) {
                     if (isset($p[$col])) {
                         $stockLevel = (int)$p[$col];
+                        $stockKnown = true;
                         break;
                     }
                 }
@@ -96,23 +100,22 @@ if (isset($pdo)) {
                     <div
                         class="product-image"
                         style="
-                            height: 140px;
+                            height: 160px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             margin-bottom: 15px;
                         "
                     >
-                        <img
-                            src="<?= htmlspecialchars($image, ENT_QUOTES) ?>"
-                            alt="<?= htmlspecialchars($productName, ENT_QUOTES) ?>"
-                            style="
-                                max-width: 100%;
-                                max-height: 140px;
-                                object-fit: contain;
-                            "
-                            onerror="this.src='images/products/default-product.png';"
-                        >
+                        <?php if ($image !== ''): ?>
+                            <img
+                                src="<?= htmlspecialchars($image, ENT_QUOTES, 'UTF-8') ?>"
+                                alt="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>"
+                                style="max-width: 100%; max-height: 160px; object-fit: contain;"
+                            >
+                        <?php else: ?>
+                            <i class="fa-solid fa-box-open" aria-hidden="true" style="font-size: 3rem; color: var(--color-text-muted, #a0a0a0);"></i>
+                        <?php endif; ?>
                     </div>
 
                     <!-- PRODUCT NAME -->
@@ -159,12 +162,14 @@ if (isset($pdo)) {
                         style="
                             font-size: 0.85rem;
                             margin: 5px 0 15px 0;
-                            color: <?= ($stockLevel > 0) ? '#2e7d32' : '#c62828' ?>;
+                            color: <?= ($stockKnown && $stockLevel > 0) ? '#2e7d32' : '#c62828' ?>;
                         "
                     >
-                        Stock:
-                        <strong><?= $stockLevel ?></strong>
-                        available
+                        <?php if ($stockKnown): ?>
+                            Stock: <strong><?= $stockLevel ?></strong> available
+                        <?php else: ?>
+                            Inventory not listed
+                        <?php endif; ?>
                     </div>
 
                     <!-- ACTION BUTTONS -->
@@ -177,7 +182,7 @@ if (isset($pdo)) {
                     >
 
                         <!-- ADD TO CART -->
-                        <?php if ($stockLevel > 0): ?>
+                        <?php if ($stockKnown && $stockLevel > 0): ?>
 
                             <button
                                 type="button"
@@ -218,7 +223,7 @@ if (isset($pdo)) {
 
 
                         <!-- BUY NOW -->
-                        <?php if ($stockLevel > 0): ?>
+                        <?php if ($stockKnown && $stockLevel > 0): ?>
 
                             <button
                                 type="button"
@@ -247,7 +252,7 @@ if (isset($pdo)) {
                                     border-color: #ccc;
                                 "
                             >
-                                Out of Stock
+                                <?= $stockKnown ? 'Out of Stock' : 'Unavailable' ?>
                             </button>
 
                         <?php endif; ?>

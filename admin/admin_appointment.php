@@ -1,7 +1,7 @@
 <?php
 // /admin/admin_appointment.php
 
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 
 require_once '../includes/config.php';
 /** @var PDO $pdo */
@@ -23,7 +23,18 @@ if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
 // ============================================================
 
 $search = trim($_GET['search'] ?? '');
-$status_filter = $_GET['status'] ?? '';
+$status_filter = is_string($_GET['status'] ?? null) ? trim($_GET['status']) : '';
+$valid_statuses = ['Pending', 'Cancelled', 'Completed'];
+if (!in_array($status_filter, $valid_statuses, true)) {
+    $status_filter = '';
+}
+$appointmentStats = $pdo->query("
+    SELECT COUNT(*) AS total,
+           SUM(bookingStatus IN ('Pending', 'Confirmed')) AS pending,
+           SUM(bookingStatus IN ('Cancelled', 'Rejected')) AS cancelled,
+           SUM(bookingStatus = 'Completed') AS completed
+    FROM service_booking
+")->fetch(PDO::FETCH_ASSOC) ?: [];
 
 
 // ============================================================
@@ -32,18 +43,37 @@ $status_filter = $_GET['status'] ?? '';
 
 $query = "
     SELECT
-        sb.*,
-        s.name AS service_name,
-        s.price AS service_price,
-        u.username AS customer_username
-    FROM service_bookings sb
-
-    LEFT JOIN services s
-        ON sb.services_id = s.id
-
-    LEFT JOIN users u
-        ON sb.user_id = u.id
-
+        sb.bookingId as id,
+        sb.bookingId,
+        sb.userId as user_id,
+        sb.serviceId as service_id,
+        COALESCE(sb.bookingVehicleModel, m.motorcycleModel) as vehicle_model,
+        m.motorcyclePlateNumber as vehicle_plate,
+        sb.bookingDate as booking_date,
+        sb.bookingTime as booking_time,
+        sb.bookingBundleSlug as bundle_slug,
+        sb.bookingBundleOption as bundle_option,
+        CASE
+            WHEN sb.bookingStatus = 'Confirmed' THEN 'Pending'
+            WHEN sb.bookingStatus = 'Rejected' THEN 'Cancelled'
+            ELSE sb.bookingStatus
+        END AS status,
+        sb.bookingNotes as notes,
+        sb.bookingRejectionReason as rejection_reason,
+        sb.createdByStaffId,
+        sb.bookingSource,
+        sb.bookingCreatedAt as created_at,
+        CONCAT_WS(' ', u.userFirstName, u.userLastName) AS customer_name,
+        CONCAT_WS(' ', creator.userFirstName, creator.userLastName) AS staff_creator_name,
+        u.userEmail AS customer_email,
+        u.userPhone AS customer_phone,
+        s.serviceName AS service_name,
+        s.servicePrice AS service_price
+    FROM service_booking sb
+    INNER JOIN user u ON sb.userId = u.userId
+    INNER JOIN service s ON sb.serviceId = s.serviceId
+    LEFT JOIN motorcycle m ON m.motorcycleId = sb.bookingMotorcycleId
+    LEFT JOIN user creator ON creator.userId = sb.createdByStaffId
     WHERE 1=1
 ";
 
@@ -58,17 +88,21 @@ if (!empty($search)) {
 
     $query .= "
         AND (
-            sb.id LIKE ?
-            OR sb.full_name LIKE ?
-            OR sb.contact_number LIKE ?
-            OR sb.vehicle_model LIKE ?
-            OR s.name LIKE ?
-            OR u.username LIKE ?
+            sb.bookingId LIKE ?
+            OR CONCAT_WS(' ', u.userFirstName, u.userLastName) LIKE ?
+            OR u.userEmail LIKE ?
+            OR u.userPhone LIKE ?
+            OR COALESCE(sb.bookingVehicleModel, m.motorcycleModel) LIKE ?
+            OR m.motorcyclePlateNumber LIKE ?
+            OR s.serviceName LIKE ?
+            OR sb.bookingBundleSlug LIKE ?
         )
     ";
 
     $term = "%$search%";
 
+    $params[] = $term;
+    $params[] = $term;
     $params[] = $term;
     $params[] = $term;
     $params[] = $term;
@@ -84,9 +118,14 @@ if (!empty($search)) {
 
 if (!empty($status_filter) && $status_filter !== 'all') {
 
-    $query .= " AND sb.status = ?";
-
-    $params[] = $status_filter;
+    if ($status_filter === 'Pending') {
+        $query .= " AND sb.bookingStatus IN ('Pending', 'Confirmed')";
+    } elseif ($status_filter === 'Cancelled') {
+        $query .= " AND sb.bookingStatus IN ('Cancelled', 'Rejected')";
+    } else {
+        $query .= ' AND sb.bookingStatus = ?';
+        $params[] = $status_filter;
+    }
 }
 
 
@@ -96,8 +135,8 @@ if (!empty($status_filter) && $status_filter !== 'all') {
 
 $query .= "
     ORDER BY
-        sb.booking_date ASC,
-        sb.booking_time ASC
+        sb.bookingDate ASC,
+        sb.bookingTime ASC
 ";
 
 
@@ -121,7 +160,7 @@ if (isset($_GET['ajax'])) {
 
         echo '
         <tr>
-            <td colspan="9"
+            <td colspan="14"
                 class="text-center"
                 style="padding: 30px; color: #64748b;">
 
@@ -136,15 +175,15 @@ if (isset($_GET['ajax'])) {
 
         foreach ($appointments as $appointment) {
 
-            $customerName = !empty($appointment['full_name'])
-                ? $appointment['full_name']
-                : ($appointment['customer_username'] ?? 'Guest/Unknown');
+            $customerName = $appointment['customer_name'] ?? 'Unknown';
+            $customerEmail = $appointment['customer_email'] ?? '';
+            $contactNumber = $appointment['customer_phone'] ?? 'N/A';
 
-            $contactNumber =
-                $appointment['contact_number'] ?? 'N/A';
-
-            $vehicleModel =
-                $appointment['vehicle_model'] ?? 'N/A';
+            $vehicleModel = $appointment['vehicle_model'] ?? 'N/A';
+            $displayVehicleModel = $vehicleModel;
+            if (!empty($appointment['vehicle_plate'])) {
+                $displayVehicleModel .= ' (' . $appointment['vehicle_plate'] . ')';
+            }
 
             $serviceName =
                 $appointment['service_name'] ?? 'N/A';
@@ -158,38 +197,22 @@ if (isset($_GET['ajax'])) {
             $status =
                 $appointment['status'] ?? 'Pending';
 
-            $notes =
-                $appointment['notes'] ?? '';
+            $notes = $appointment['notes'] ?? '';
+            $rejectionReason = $appointment['rejection_reason'] ?? '';
+            $bookingSource = match ($appointment['bookingSource']) {
+                'staff' => 'Staff-Created Booking' . (!empty($appointment['staff_creator_name']) ? ' — ' . $appointment['staff_creator_name'] : ''),
+                'admin' => 'Admin-Created Booking',
+                default => 'Customer Online Booking',
+            };
 
 
             // ------------------------------------------------
             // STATUS BADGE
             // ------------------------------------------------
 
-            $badgeStyle =
-                'background: #ffebee; color: #c62828;';
-
-            if ($status === 'Completed') {
-
-                $badgeStyle =
-                    'background: #e8f5e9; color: #2e7d32;';
-
-            } elseif ($status === 'Pending') {
-
-                $badgeStyle =
-                    'background: #fff3e0; color: #f57c00;';
-
-            } elseif ($status === 'Confirmed') {
-
-                $badgeStyle =
-                    'background: #e3f2fd; color: #1565c0;';
-
-            } elseif ($status === 'Cancelled') {
-
-                $badgeStyle =
-                    'background: #ffebee; color: #c62828;';
-
-            }
+            $badgeClass = $status === 'Completed'
+                ? 'badge-success'
+                : ($status === 'Cancelled' ? 'badge-danger' : 'badge-secondary');
 
 
             echo '<tr>';
@@ -199,7 +222,7 @@ if (isset($_GET['ajax'])) {
             // APPOINTMENT NUMBER
             // ------------------------------------------------
 
-            echo '<td>#' . $index++ . '</td>';
+            echo '<td>#' . (int) $appointment['bookingId'] . '</td>';
 
 
             // ------------------------------------------------
@@ -208,6 +231,10 @@ if (isset($_GET['ajax'])) {
 
             echo '<td>'
                 . htmlspecialchars($customerName)
+                . '</td>';
+
+            echo '<td>'
+                . htmlspecialchars($customerEmail)
                 . '</td>';
 
 
@@ -225,7 +252,7 @@ if (isset($_GET['ajax'])) {
             // ------------------------------------------------
 
             echo '<td>'
-                . htmlspecialchars($vehicleModel)
+                . htmlspecialchars($displayVehicleModel)
                 . '</td>';
 
 
@@ -236,6 +263,10 @@ if (isset($_GET['ajax'])) {
             echo '<td>'
                 . htmlspecialchars($serviceName)
                 . '</td>';
+
+            echo '<td>₱' . number_format((float) ($appointment['service_price'] ?? 0), 2) . '</td>';
+
+            echo '<td>' . htmlspecialchars($appointment['bundle_slug'] ?? '') . '</td>';
 
 
             // ------------------------------------------------
@@ -255,6 +286,14 @@ if (isset($_GET['ajax'])) {
                 . htmlspecialchars($bookingTime)
                 . '</td>';
 
+            echo '<td>' . htmlspecialchars($notes);
+            if ($rejectionReason !== '') {
+                echo '<br><strong>Rejection:</strong> ' . htmlspecialchars($rejectionReason);
+            }
+            echo '</td>';
+
+            echo '<td>' . htmlspecialchars($bookingSource) . '</td>';
+
 
             // ------------------------------------------------
             // STATUS
@@ -263,12 +302,7 @@ if (isset($_GET['ajax'])) {
             echo '<td>
 
                 <span
-                    class="badge"
-                    style="
-                        padding: 4px 8px;
-                        border-radius: 4px;
-                        ' . $badgeStyle . '
-                    ">
+                    class="badge ' . $badgeClass . '">
 
                     ' . htmlspecialchars($status) . '
 
@@ -283,13 +317,7 @@ if (isset($_GET['ajax'])) {
 
             echo '<td>
 
-                <div
-                    style="
-                        display: flex;
-                        gap: 6px;
-                        align-items: center;
-                    "
-                >';
+                <div class="table-row-actions">';
 
 
             // ------------------------------------------------
@@ -318,7 +346,7 @@ if (isset($_GET['ajax'])) {
 
                     data-vehicle="' .
                         htmlspecialchars(
-                            $vehicleModel,
+                            $displayVehicleModel,
                             ENT_QUOTES
                         )
                     . '"
@@ -358,6 +386,13 @@ if (isset($_GET['ajax'])) {
                         )
                     . '"
 
+                    data-rejection="' .
+                        htmlspecialchars(
+                            $appointment['rejection_reason'] ?? '',
+                            ENT_QUOTES
+                        )
+                    . '"
+
                     style="
                         background: #6c757d;
                         color: white;
@@ -370,7 +405,7 @@ if (isset($_GET['ajax'])) {
                     title="View Appointment"
                 >
 
-                    <i class="fas fa-eye"></i>
+                    <i class="fas fa-eye"></i> View
 
                 </button>';
 
@@ -411,7 +446,7 @@ if (isset($_GET['ajax'])) {
 
                     data-service-id="' .
                         htmlspecialchars(
-                            $appointment['services_id'] ?? '',
+                            $appointment['service_id'] ?? '',
                             ENT_QUOTES
                         )
                     . '"
@@ -444,6 +479,13 @@ if (isset($_GET['ajax'])) {
                         )
                     . '"
 
+                    data-rejection="' .
+                        htmlspecialchars(
+                            $appointment['rejection_reason'] ?? '',
+                            ENT_QUOTES
+                        )
+                    . '"
+
                     style="
                         background: #1976d2;
                         color: white;
@@ -456,7 +498,7 @@ if (isset($_GET['ajax'])) {
                     title="Edit Appointment"
                 >
 
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-edit"></i> Edit
 
                 </button>';
             }
@@ -466,31 +508,11 @@ if (isset($_GET['ajax'])) {
             // DELETE BUTTON
             // ------------------------------------------------
 
-            echo '<a
-                    href="actions/admin_appointment_delete.php?id=' .
-                        $appointment['id']
-                    . '"
-
-                    class="btn-sm"
-
-                    style="
-                        background: #dc3545;
-                        color: white;
-                        padding: 6px 10px;
-                        border-radius: 4px;
-                        text-decoration: none;
-                    "
-
-                    onclick="return confirm(\'Are you sure you want to delete appointment #' .
-                        $appointment['id']
-                    . '?\');"
-
-                    title="Delete Appointment"
-                >
-
-                    <i class="fas fa-trash"></i>
-
-                </a>';
+            echo '<form method="POST" action="actions/admin_appointment_delete.php" style="display:inline" onsubmit="return confirm(\'Are you sure you want to delete appointment #' . (int) $appointment['id'] . '?\');">'
+                . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') . '">'
+                . '<input type="hidden" name="id" value="' . (int) $appointment['id'] . '">'
+                . '<button type="submit" class="btn-sm" style="background:#dc3545;color:white;padding:6px 10px;border:0;border-radius:4px" title="Delete Appointment"><i class="fas fa-trash"></i> Delete</button>'
+                . '</form>';
 
 
             echo '</div>';
@@ -510,9 +532,7 @@ if (isset($_GET['ajax'])) {
 // ============================================================
 
 $servicesStmt = $pdo->query("
-    SELECT id, name, price
-    FROM services
-    ORDER BY name ASC
+    SELECT serviceId as id, serviceName as name, servicePrice as price, serviceId, serviceName, servicePrice FROM service ORDER BY serviceName ASC
 ");
 
 $allServices =
@@ -524,9 +544,7 @@ $allServices =
 // ============================================================
 
 $usersStmt = $pdo->query("
-    SELECT id, username
-    FROM users
-    ORDER BY username ASC
+    SELECT userId as id, username, userId, username FROM user WHERE userRole = 'customer' ORDER BY username ASC
 ");
 
 $allUsers =
@@ -567,6 +585,10 @@ $allUsers =
     <link
         rel="stylesheet"
         href="css/admin_products.css"
+    >
+    <link
+        rel="stylesheet"
+        href="css/admin_dashboard.css"
     >
 
 </head>
@@ -651,6 +673,21 @@ $allUsers =
 
             <?php endif; ?>
 
+            <div class="order-stats appointment-stats">
+                <?php foreach ([
+                    'total' => 'All Appointments',
+                    'pending' => 'Pending',
+                    'cancelled' => 'Cancelled',
+                    'completed' => 'Completed',
+                ] as $key => $label): ?>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <h3><?= (int) ($appointmentStats[$key] ?? 0) ?></h3>
+                            <p><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
 
             <!-- =================================================
                  SEARCH AND FILTER
@@ -715,20 +752,7 @@ $allUsers =
 
                         <?php
 
-                        $statuses = [
-
-                            '' => 'All Statuses',
-
-                            'Pending' => 'Pending',
-
-                            'Confirmed' => 'Confirmed',
-
-                            'Completed' => 'Completed',
-
-                            'Cancelled' => 'Cancelled'
-
-                        ];
-
+                        $statuses = ['' => 'All Statuses'] + array_combine($valid_statuses, $valid_statuses);
                         ?>
 
 
@@ -814,15 +838,25 @@ $allUsers =
 
                             <th>Customer</th>
 
+                            <th>Email</th>
+
                             <th>Contact</th>
 
                             <th>Vehicle</th>
 
                             <th>Service</th>
 
+                            <th>Price</th>
+
+                            <th>Bundle</th>
+
                             <th>Date</th>
 
                             <th>Time</th>
+
+                            <th>Notes</th>
+
+                            <th>Booking Source</th>
 
                             <th>Status</th>
 
@@ -841,7 +875,7 @@ $allUsers =
                         <tr>
 
                             <td
-                                colspan="9"
+                                colspan="14"
                                 class="text-center"
                                 style="
                                     padding: 30px;
@@ -859,31 +893,21 @@ $allUsers =
                     <?php else: ?>
 
 
-                        <?php $index = 1; ?>
-
-
                         <?php foreach ($appointments as $appointment): ?>
 
 
                             <?php
 
-                            $customerName =
-                                !empty($appointment['full_name'])
-                                ? $appointment['full_name']
-                                : (
-                                    $appointment['customer_username']
-                                    ?? 'Guest/Unknown'
-                                );
+                            $customerName = $appointment['customer_name'] ?? 'Unknown';
+                            $customerEmail = $appointment['customer_email'] ?? '';
+                            $contactNumber = $appointment['customer_phone'] ?? 'N/A';
 
 
-                            $contactNumber =
-                                $appointment['contact_number']
-                                ?? 'N/A';
-
-
-                            $vehicleModel =
-                                $appointment['vehicle_model']
-                                ?? 'N/A';
+                            $vehicleModel = $appointment['vehicle_model'] ?? 'N/A';
+                            $displayVehicleModel = $vehicleModel;
+                            if (!empty($appointment['vehicle_plate'])) {
+                                $displayVehicleModel .= ' (' . $appointment['vehicle_plate'] . ')';
+                            }
 
 
                             $serviceName =
@@ -906,35 +930,22 @@ $allUsers =
                                 ?? 'Pending';
 
 
-                            $notes =
-                                $appointment['notes']
-                                ?? '';
+                            $notes = $appointment['notes'] ?? '';
+                            $rejectionReason = $appointment['rejection_reason'] ?? '';
+                            $bookingSource = match ($appointment['bookingSource']) {
+                                'staff' => 'Staff-Created Booking' . (!empty($appointment['staff_creator_name']) ? ' — ' . $appointment['staff_creator_name'] : ''),
+                                'admin' => 'Admin-Created Booking',
+                                default => 'Customer Online Booking',
+                            };
 
 
                             // ------------------------------------
                             // STATUS BADGE
                             // ------------------------------------
 
-                            $badgeStyle =
-                                'background: #ffebee; color: #c62828;';
-
-
-                            if ($status === 'Completed') {
-
-                                $badgeStyle =
-                                    'background: #e8f5e9; color: #2e7d32;';
-
-                            } elseif ($status === 'Pending') {
-
-                                $badgeStyle =
-                                    'background: #fff3e0; color: #f57c00;';
-
-                            } elseif ($status === 'Confirmed') {
-
-                                $badgeStyle =
-                                    'background: #e3f2fd; color: #1565c0;';
-
-                            }
+                            $badgeClass = $status === 'Completed'
+                                ? 'badge-success'
+                                : ($status === 'Cancelled' ? 'badge-danger' : 'badge-secondary');
 
                             ?>
 
@@ -945,7 +956,7 @@ $allUsers =
                                 <!-- ID -->
 
                                 <td>
-                                    #<?= $index++ ?>
+                                    #<?= (int) $appointment['bookingId'] ?>
                                 </td>
 
 
@@ -954,6 +965,8 @@ $allUsers =
                                 <td>
                                     <?= htmlspecialchars($customerName) ?>
                                 </td>
+
+                                <td><?= htmlspecialchars($customerEmail) ?></td>
 
 
                                 <!-- CONTACT -->
@@ -966,7 +979,7 @@ $allUsers =
                                 <!-- VEHICLE -->
 
                                 <td>
-                                    <?= htmlspecialchars($vehicleModel) ?>
+                                    <?= htmlspecialchars($displayVehicleModel) ?>
                                 </td>
 
 
@@ -975,6 +988,10 @@ $allUsers =
                                 <td>
                                     <?= htmlspecialchars($serviceName) ?>
                                 </td>
+
+                                <td>₱<?= number_format((float) ($appointment['service_price'] ?? 0), 2) ?></td>
+
+                                <td><?= htmlspecialchars($appointment['bundle_slug'] ?? '') ?></td>
 
 
                                 <!-- DATE -->
@@ -990,19 +1007,20 @@ $allUsers =
                                     <?= htmlspecialchars($bookingTime) ?>
                                 </td>
 
+                                <td>
+                                    <?= htmlspecialchars($notes) ?>
+                                    <?php if ($rejectionReason !== ''): ?><br><strong>Rejection:</strong> <?= htmlspecialchars($rejectionReason) ?><?php endif; ?>
+                                </td>
+
+                                <td><?= htmlspecialchars($bookingSource) ?></td>
+
 
                                 <!-- STATUS -->
 
                                 <td>
 
                                     <span
-                                        class="badge"
-
-                                        style="
-                                            padding: 4px 8px;
-                                            border-radius: 4px;
-                                            <?= $badgeStyle ?>
-                                        "
+                                        class="badge <?= $badgeClass ?>"
                                     >
 
                                         <?= htmlspecialchars($status) ?>
@@ -1016,13 +1034,7 @@ $allUsers =
 
                                 <td>
 
-                                    <div
-                                        style="
-                                            display: flex;
-                                            gap: 6px;
-                                            align-items: center;
-                                        "
-                                    >
+                                    <div class="table-row-actions">
 
 
                                         <!-- VIEW -->
@@ -1038,7 +1050,7 @@ $allUsers =
 
                                             data-contact="<?= htmlspecialchars($contactNumber, ENT_QUOTES) ?>"
 
-                                            data-vehicle="<?= htmlspecialchars($vehicleModel, ENT_QUOTES) ?>"
+                                            data-vehicle="<?= htmlspecialchars($displayVehicleModel, ENT_QUOTES) ?>"
 
                                             data-service="<?= htmlspecialchars($serviceName, ENT_QUOTES) ?>"
 
@@ -1049,6 +1061,8 @@ $allUsers =
                                             data-status="<?= htmlspecialchars($status, ENT_QUOTES) ?>"
 
                                             data-notes="<?= htmlspecialchars($notes, ENT_QUOTES) ?>"
+
+                                            data-rejection="<?= htmlspecialchars($rejectionReason, ENT_QUOTES) ?>"
 
                                             style="
                                                 background: #6c757d;
@@ -1062,7 +1076,7 @@ $allUsers =
                                             title="View Appointment"
                                         >
 
-                                            <i class="fas fa-eye"></i>
+                                            <i class="fas fa-eye"></i> View
 
                                         </button>
 
@@ -1078,7 +1092,7 @@ $allUsers =
 
                                             data-userid="<?= $appointment['user_id'] ?? '' ?>"
 
-                                            data-service-id="<?= $appointment['services_id'] ?? '' ?>"
+                                            data-service-id="<?= $appointment['service_id'] ?? '' ?>"
 
                                             data-customer="<?= htmlspecialchars($customerName, ENT_QUOTES) ?>"
 
@@ -1094,6 +1108,8 @@ $allUsers =
 
                                             data-notes="<?= htmlspecialchars($notes, ENT_QUOTES) ?>"
 
+                                            data-rejection="<?= htmlspecialchars($rejectionReason, ENT_QUOTES) ?>"
+
                                             style="
                                                 background: #1976d2;
                                                 color: white;
@@ -1106,7 +1122,7 @@ $allUsers =
                                             title="Edit Appointment"
                                         >
 
-                                            <i class="fas fa-edit"></i>
+                                            <i class="fas fa-edit"></i> Edit
 
                                         </button>
                                         <?php endif; ?>
@@ -1114,27 +1130,11 @@ $allUsers =
 
                                         <!-- DELETE -->
 
-                                        <a
-                                            href="actions/admin_appointment_delete.php?id=<?= $appointment['id'] ?>"
-
-                                            class="btn-sm"
-
-                                            style="
-                                                background: #dc3545;
-                                                color: white;
-                                                padding: 6px 10px;
-                                                border-radius: 4px;
-                                                text-decoration: none;
-                                            "
-
-                                            onclick="return confirm('Are you sure you want to delete appointment #<?= $appointment['id'] ?>?');"
-
-                                            title="Delete Appointment"
-                                        >
-
-                                            <i class="fas fa-trash"></i>
-
-                                        </a>
+                                        <form method="POST" action="actions/admin_appointment_delete.php" style="display:inline" onsubmit="return confirm('Are you sure you want to delete appointment #<?= (int) $appointment['id'] ?>?');">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                            <input type="hidden" name="id" value="<?= (int) $appointment['id'] ?>">
+                                            <button type="submit" class="btn-sm" style="background:#dc3545;color:white;padding:6px 10px;border:0;border-radius:4px" title="Delete Appointment"><i class="fas fa-trash"></i> Delete</button>
+                                        </form>
 
 
                                     </div>
@@ -1475,7 +1475,7 @@ $allUsers =
 
             <input
                 type="hidden"
-                name="users_id"
+                name="user_id"
                 id="modal_users_id"
             >
 
@@ -1534,7 +1534,7 @@ $allUsers =
 
 
                 <select
-                    name="services_id"
+                    name="service_id"
                     id="modal_services_id"
 
                     class="form-control"
@@ -1597,7 +1597,6 @@ $allUsers =
 
                 <input
                     type="text"
-                    name="full_name"
                     id="modal_full_name"
 
                     class="form-control"
@@ -1609,7 +1608,6 @@ $allUsers =
                         border-radius: 4px;
                     "
 
-                    required
                 >
 
             </div>
@@ -1637,7 +1635,6 @@ $allUsers =
 
                 <input
                     type="tel"
-                    name="contact_number"
                     id="modal_contact_number"
                     inputmode="numeric"
                     pattern="09[0-9]{9}"
@@ -1654,7 +1651,6 @@ $allUsers =
                         border-radius: 4px;
                     "
 
-                    required
                 >
 
             </div>
@@ -1760,7 +1756,8 @@ $allUsers =
                 </label>
 
 
-                <select
+                <input
+                    type="time"
                     name="booking_time"
                     id="modal_booking_time"
                     class="form-control"
@@ -1772,15 +1769,6 @@ $allUsers =
                     "
                     required
                 >
-                    <option value="" disabled selected>Select time slot</option>
-                    <option value="09:00 AM - 10:30 AM">09:00 AM - 10:30 AM</option>
-                    <option value="10:30 AM - 12:00 PM">10:30 AM - 12:00 PM</option>
-                    <option value="01:00 PM - 02:30 PM">01:00 PM - 02:30 PM</option>
-                    <option value="02:30 PM - 04:00 PM">02:30 PM - 04:00 PM</option>
-                    <option value="04:00 PM - 05:30 PM">04:00 PM - 05:30 PM</option>
-                </select>
-
-                </select>
 
             </div>
 
@@ -1821,26 +1809,33 @@ $allUsers =
                     required
                 >
 
-                    <option value="Pending">
-                        Pending
-                    </option>
-
-                    <option value="Confirmed">
-                        Confirmed
-                    </option>
-
-                    <option value="Completed">
-                        Completed
-                    </option>
-
-                    <option value="Cancelled">
-                        Cancelled
-                    </option>
+                    <option value="Pending">Pending</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Completed">Completed</option>
 
                 </select>
 
             </div>
 
+
+            <!-- REJECTION REASON -->
+
+            <div
+                class="form-group"
+                style="margin-bottom: 15px;"
+            >
+                <label for="modal_rejection_reason" style="display:block;margin-bottom:5px;font-weight:500;">
+                    Cancellation Reason (optional):
+                </label>
+                <textarea
+                    name="rejection_reason"
+                    id="modal_rejection_reason"
+                    class="form-control"
+                    rows="2"
+                    maxlength="1000"
+                    style="width:100%;padding:8px;border:1px solid #ced4da;border-radius:4px;resize:vertical;"
+                ></textarea>
+            </div>
 
             <!-- NOTES -->
 
@@ -2046,7 +2041,7 @@ $allUsers =
 
 
                 <select
-                    name="users_id"
+                    name="user_id"
 
                     class="form-control"
 
@@ -2101,7 +2096,7 @@ $allUsers =
 
 
                 <select
-                    name="services_id"
+                    name="service_id"
 
                     class="form-control"
 
@@ -2131,89 +2126,6 @@ $allUsers =
                     <?php endforeach; ?>
 
                 </select>
-
-            </div>
-
-
-            <!-- FULL NAME -->
-
-            <div
-                class="form-group"
-                style="margin-bottom: 15px;"
-            >
-
-                <label
-                    style="
-                        display: block;
-                        margin-bottom: 5px;
-                        font-weight: 500;
-                    "
-                >
-
-                    Full Name:
-
-                </label>
-
-
-                <input
-                    type="text"
-                    name="full_name"
-
-                    class="form-control"
-
-                    style="
-                        width: 100%;
-                        padding: 8px;
-                        border: 1px solid #ced4da;
-                        border-radius: 4px;
-                    "
-
-                    required
-                >
-
-            </div>
-
-
-            <!-- CONTACT -->
-
-            <div
-                class="form-group"
-                style="margin-bottom: 15px;"
-            >
-
-                <label
-                    style="
-                        display: block;
-                        margin-bottom: 5px;
-                        font-weight: 500;
-                    "
-                >
-
-                    Contact Number:
-
-                </label>
-
-
-                <input
-                    type="tel"
-                    name="contact_number"
-                    inputmode="numeric"
-                    pattern="09[0-9]{9}"
-                    minlength="11"
-                    maxlength="11"
-                    title="Enter an 11-digit Philippine mobile number starting with 09"
-
-                    class="form-control"
-
-                    style="
-                        width: 100%;
-                        padding: 8px;
-                        border: 1px solid #ced4da;
-                        border-radius: 4px;
-                    "
-
-                    required
-                >
 
             </div>
 
@@ -2328,11 +2240,11 @@ $allUsers =
                     required
                 >
                     <option value="" disabled selected>Select time slot</option>
-                    <option value="09:00 AM - 10:30 AM">09:00 AM - 10:30 AM</option>
-                    <option value="10:30 AM - 12:00 PM">10:30 AM - 12:00 PM</option>
-                    <option value="01:00 PM - 02:30 PM">01:00 PM - 02:30 PM</option>
-                    <option value="02:30 PM - 04:00 PM">02:30 PM - 04:00 PM</option>
-                    <option value="04:00 PM - 05:30 PM">04:00 PM - 05:30 PM</option>
+                    <option value="09:00:00">09:00 AM - 10:30 AM</option>
+                    <option value="10:30:00">10:30 AM - 12:00 PM</option>
+                    <option value="13:00:00">01:00 PM - 02:30 PM</option>
+                    <option value="14:30:00">02:30 PM - 04:00 PM</option>
+                    <option value="16:00:00">04:00 PM - 05:30 PM</option>
                 </select>
 
             </div>
@@ -2708,7 +2620,10 @@ document.addEventListener(
                     document.getElementById(
                         'view_notes'
                     ).innerText =
-                        ds.notes || 'None';
+                        (ds.notes || 'None') +
+                        (ds.rejection
+                            ? '\nRejection reason: ' + ds.rejection
+                            : '');
 
 
                     document.getElementById(
@@ -2792,13 +2707,18 @@ document.addEventListener(
                     document.getElementById(
                         'modal_booking_time'
                     ).value =
-                        ds.time;
+                        (ds.time || '').slice(0, 5);
 
 
                     document.getElementById(
                         'modal_status'
                     ).value =
                         ds.status;
+
+                    document.getElementById(
+                        'modal_rejection_reason'
+                    ).value =
+                        ds.rejection || '';
 
 
                     document.getElementById(

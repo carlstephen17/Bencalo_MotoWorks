@@ -1,42 +1,67 @@
-    <?php
+<?php
 // includes/auth.php
 
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.cookie_samesite', 'Lax');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
+} elseif (!headers_sent()) {
+    $cookieParams = session_get_cookie_params();
+    $cookieOptions = [
+        'expires' => 0,
+        'path' => $cookieParams['path'] !== '' ? $cookieParams['path'] : '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ];
+    if ($cookieParams['domain'] !== '') {
+        $cookieOptions['domain'] = $cookieParams['domain'];
+    }
+    setcookie(session_name(), session_id(), $cookieOptions);
 }
 
 /**
- * Check if the current logged-in user is an admin.
- * Assumes your users table has an 'is_admin' or 'role' column. Adjust if needed.
+ * Check whether a database user has the requested role.
  */
-function isAdmin($userId) {
+function hasRole(int|string $userId, string $role): bool
+{
     global $pdo;
-    
-    if (!$pdo) {
+
+    if (!isset($pdo) || !($pdo instanceof PDO) || !in_array($role, ['admin', 'staff', 'customer'], true)) {
         return false;
     }
 
-    $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+    $stmt = $pdo->prepare('SELECT userRole FROM `user` WHERE userId = ? LIMIT 1');
     $stmt->execute([$userId]);
-    $user = $stmt->fetch();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user && isset($user['role']) && $user['role'] === 'admin') {
-        return true;
-    }
+    return isset($user['userRole']) && $user['userRole'] === $role;
+}
 
-    // Alternative fallback if your database uses an 'is_admin' integer column (1 for admin, 0 for regular):
-    // $stmt = $pdo->prepare("SELECT is_admin FROM users WHERE id = ?");
-    // $stmt->execute([$userId]);
-    // $user = $stmt->fetch();
-    // return $user && ((int)$user['is_admin'] === 1);
+function isAdmin(int|string $userId): bool
+{
+    return hasRole($userId, 'admin');
+}
 
-    return false;
+function isStaff(int|string $userId): bool
+{
+    return hasRole($userId, 'staff');
 }
 
 /**
  * Generate a CSRF token for forms.
  */
-function generateCSRFToken() {
+function generateCSRFToken(): string
+{
     if (empty($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
@@ -46,10 +71,18 @@ function generateCSRFToken() {
 /**
  * Verify a submitted CSRF token.
  */
-function verifyCSRFToken($token) {
-    if (!isset($_SESSION['csrf_token']) || empty($token)) {
+function verifyCSRFToken(mixed $token): bool
+{
+    if (!is_string($token) || $token === '' || !isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
         return false;
     }
     return hash_equals($_SESSION['csrf_token'], $token);
 }
-?>
+
+function requireValidCSRFToken(): void
+{
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        exit('Invalid security token. Refresh the page and try again.');
+    }
+}

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 
 if (!isset($pdo)) {
     require_once __DIR__ . '/../includes/config.php';
@@ -8,16 +9,15 @@ if (!isset($pdo)) {
 // SESSION / CSRF SETUP
 // =====================================================
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 $user_phone = $user_phone ?? '';
 $modal_full_name = '';
+$bookingServices = $pdo->query(
+    "SELECT serviceId as id, serviceName as name, serviceId, serviceName FROM service WHERE serviceActive = 1 ORDER BY serviceName ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
 
 // =====================================================
@@ -29,10 +29,7 @@ if (isset($_SESSION['user_id'])) {
     try {
 
         $modalUserStmt = $pdo->prepare("
-            SELECT first_name, last_name, phone
-            FROM users
-            WHERE id = ?
-            LIMIT 1
+            SELECT userFirstName as first_name, userLastName as last_name, userPhone as phone FROM `user` WHERE userId = ? LIMIT 1
         ");
 
         $modalUserStmt->execute([
@@ -1362,7 +1359,7 @@ if (isset($_SESSION['user_id'])) {
         <form
             id="ajax-forgot-form"
             class="auth-form"
-            action="forgot-password.php"
+            action="forgot_password.php"
             method="POST">
 
 
@@ -1477,7 +1474,7 @@ if (isset($_SESSION['user_id'])) {
 
 
         <form
-            action="claim_promo.php"
+            action="process_booking.php"
             method="POST">
 
 
@@ -1506,7 +1503,6 @@ if (isset($_SESSION['user_id'])) {
 
                 <input
                     type="text"
-                    name="fullname"
                     value="<?= htmlspecialchars(
                                 $modal_full_name,
                                 ENT_QUOTES,
@@ -1514,7 +1510,7 @@ if (isset($_SESSION['user_id'])) {
                             ) ?>"
                     class="form-control"
                     readonly
-                    required>
+                    >
 
             </div>
 
@@ -1528,7 +1524,6 @@ if (isset($_SESSION['user_id'])) {
 
                 <input
                     type="text"
-                    name="phone"
                     value="<?= htmlspecialchars(
                                 $user_phone,
                                 ENT_QUOTES,
@@ -1536,8 +1531,24 @@ if (isset($_SESSION['user_id'])) {
                             ) ?>"
                     class="form-control"
                     readonly
-                    required>
+                    >
 
+            </div>
+
+
+            <div class="form-group">
+                <label>Service</label>
+                <select name="service_id" class="form-control" required>
+                    <option value="">Select Service</option>
+                    <?php foreach ($bookingServices as $bookingService): ?>
+                        <option value="<?= (int) $bookingService['id'] ?>"><?= htmlspecialchars($bookingService['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Vehicle Model</label>
+                <input type="text" name="vehicle_model" class="form-control" maxlength="255" required>
             </div>
 
 
@@ -1555,6 +1566,11 @@ if (isset($_SESSION['user_id'])) {
                     required>
                 </select>
 
+            </div>
+
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea name="notes" class="form-control" rows="3"></textarea>
             </div>
 
 
@@ -2943,9 +2959,17 @@ if (isset($_SESSION['user_id'])) {
                                     isLoggedIn =
                                         true;
 
+                                    if (data.csrf_token) {
+                                        document
+                                            .querySelectorAll('input[name="csrf_token"]')
+                                            .forEach(input => {
+                                                input.value = data.csrf_token;
+                                            });
+                                    }
 
                                     if (
-                                        data.is_admin
+                                        data.role === 'admin' ||
+                                        data.role === 'staff'
                                     ) {
 
                                         window.location.href =
@@ -2960,6 +2984,22 @@ if (isset($_SESSION['user_id'])) {
                                         formData.get(
                                             'username'
                                         );
+
+                                    const userDropdown =
+                                        document.getElementById(
+                                            'nav-user-dropdown'
+                                        );
+                                    const guestButtons =
+                                        document.getElementById(
+                                            'nav-guest-buttons'
+                                        );
+
+                                    if (userDropdown) {
+                                        userDropdown.style.display = 'block';
+                                    }
+                                    if (guestButtons) {
+                                        guestButtons.style.display = 'none';
+                                    }
 
 
                                     document
@@ -3500,7 +3540,7 @@ if (isset($_SESSION['user_id'])) {
 
             handleFormSubmit(
                 'ajax-forgot-form',
-                'forgot-password.php',
+                'forgot_password.php',
                 'forgot-modal'
             );
 

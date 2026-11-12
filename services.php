@@ -2,9 +2,7 @@
 
 require_once 'includes/config.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -34,9 +32,7 @@ if (
     try {
 
         $stmt = $pdo->prepare("
-            SELECT *
-            FROM users
-            WHERE remember_token = ?
+            SELECT userId as id, username, userFirstName as first_name, userRole as role FROM `user` WHERE userRememberToken = ?
         ");
 
         $stmt->execute([$token]);
@@ -77,9 +73,7 @@ if (
     try {
 
         $stmt = $pdo->prepare("
-            SELECT first_name, last_name, phone
-            FROM users
-            WHERE id = ?
+            SELECT userFirstName as first_name, userLastName as last_name, userPhone as phone FROM `user` WHERE userId = ?
         ");
 
         $stmt->execute([
@@ -142,164 +136,13 @@ if (
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| DEFAULT SERVICES
-|--------------------------------------------------------------------------
-|
-| These are used to seed the database if the services do not yet exist.
-|--------------------------------------------------------------------------
-*/
-
-$default_services = [
-
-    [
-        "id" => 1,
-        "name" => "Premium Oil & Change Service",
-        "description" =>
-            "Full synthetic oil, new filter, comprehensive check-up.",
-        "price" => 450.00,
-        "image" =>
-            "images/featured_products/synthetic_oil.png",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 2,
-        "name" => "Wheel & Tire Service",
-        "description" =>
-            "Mounting, precision balancing, and pressure check.",
-        "price" => 350.00,
-        "image" =>
-            "images/featured_products/tire.webp",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 3,
-        "name" => "Vehicle Washing Service",
-        "description" =>
-            "Complete exterior wash, foam bath, wheel cleaning, and wax finishing.",
-        "price" => 600.00,
-        "image" =>
-            "images/featured_services/vehicle_washing_service.png",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 4,
-        "name" => "Battery Service",
-        "description" =>
-            "Battery inspection, voltage testing, terminal cleaning, and battery replacement.",
-        "price" => 250.00,
-        "image" =>
-            "images/featured_services/battery_service.png",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 5,
-        "name" => "General Maintenance & Tune-Up",
-        "description" =>
-            "Comprehensive inspection, oil change, filter replacement, and engine tuning.",
-        "price" => 450.00,
-        "image" =>
-            "images/services/general.png",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 6,
-        "name" => "Chain & Sprocket Replacement",
-        "description" =>
-            "Removal of worn components, installation of new high-durability chain and sprockets, and tension adjustment.",
-        "price" => 200.00,
-        "image" =>
-            "images/services/chain.png",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 7,
-        "name" => "Brake System Servicing",
-        "description" =>
-            "Professional brake pad replacement, rotor inspection, and hydraulic fluid flushing.",
-        "price" => 350.00,
-        "image" =>
-            "images/services/brake.png",
-        "featured" => 0
-    ],
-
-    [
-        "id" => 8,
-        "name" => "Electrical System & Wiring Repair",
-        "description" =>
-            "Diagnostic testing, wiring harness repair, lighting checks, and electrical troubleshooting.",
-        "price" => 280.00,
-        "image" =>
-            "images/services/electrical.png",
-        "featured" => 0
-    ]
-];
-
-
-/*
-|--------------------------------------------------------------------------
-| FETCH / SEED SERVICES
-|--------------------------------------------------------------------------
-*/
-
 $services = [];
 
 if (isset($pdo)) {
 
     try {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Insert default services when necessary
-        |--------------------------------------------------------------------------
-        */
-
-        $stmtUpsert = $pdo->prepare("
-            INSERT INTO services
-                (id, name, description, price, image, active, featured)
-
-            VALUES
-                (?, ?, ?, ?, ?, 1, ?)
-
-            ON DUPLICATE KEY UPDATE
-                name = VALUES(name),
-                description = VALUES(description),
-                price = VALUES(price),
-                image = VALUES(image),
-                featured = VALUES(featured)
-        ");
-
-        foreach ($default_services as $ds) {
-
-            $stmtUpsert->execute([
-                $ds['id'],
-                $ds['name'],
-                $ds['description'],
-                $ds['price'],
-                $ds['image'],
-                $ds['featured']
-            ]);
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Get active services
-        |--------------------------------------------------------------------------
-        */
-
         $stmt = $pdo->query("
-            SELECT *
-            FROM services
-            WHERE active = 1
-            ORDER BY id ASC
+            SELECT serviceId as id, serviceName as name, serviceDescription as description, servicePrice as price, serviceImage as image, serviceActive as active, serviceFeatured as featured, serviceId, serviceName, serviceDescription, servicePrice, serviceImage, serviceActive, serviceFeatured FROM service WHERE serviceActive = 1 ORDER BY serviceId ASC
         ");
 
         $services =
@@ -307,13 +150,32 @@ if (isset($pdo)) {
 
     } catch (Exception $e) {
 
-        $services = $default_services;
+        error_log('Unable to load services: ' . $e->getMessage());
+        $services = [];
     }
 
 } else {
 
-    $services = $default_services;
+    $services = [];
 }
+
+$seenServiceNames = [];
+$services = array_values(array_filter(
+    $services,
+    static function ($service) use (&$seenServiceNames) {
+        $name = strtolower(trim((string)($service['name'] ?? '')));
+
+        if ($name !== '' && isset($seenServiceNames[$name])) {
+            return false;
+        }
+
+        if ($name !== '') {
+            $seenServiceNames[$name] = true;
+        }
+
+        return true;
+    }
+));
 
 ?>
 

@@ -1,11 +1,9 @@
 <?php
-// Ensure session and variables like $cart_count are available if needed
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../includes/auth.php';
 $cart_count = $cart_count ?? 0;
 $isLoggedIn = isset($_SESSION['user_id']);
 $isAdmin = $isLoggedIn && ($_SESSION['role'] ?? '') === 'admin';
+$isStaff = $isLoggedIn && ($_SESSION['role'] ?? '') === 'staff';
 ?>
 <!-- ==================== SITE HEADER SECTION ==================== -->
 <header class="site-header">
@@ -28,13 +26,14 @@ $isAdmin = $isLoggedIn && ($_SESSION['role'] ?? '') === 'admin';
         <div class="header-cta-group">
             <a href="cart.php" class="header-cart-link">
                 <i class="fa-solid fa-cart-shopping"></i>
-                <span id="cart-count-badge" class="cart-badge"><?= $cart_count ?></span>
             </a>
 
             <a href="services.php" class="btn btn-primary">Book Appointment</a>
 
             <?php if ($isAdmin): ?>
                 <a href="admin/admin_index.php" class="btn btn-primary">Dashboard</a>
+            <?php elseif ($isStaff): ?>
+                <a href="staff/staff_index.php" class="btn btn-primary">Staff Dashboard</a>
             <?php endif; ?>
 
             <!-- LOGGED-IN USER DROPDOWN -->
@@ -47,7 +46,10 @@ $isAdmin = $isLoggedIn && ($_SESSION['role'] ?? '') === 'admin';
                     <a href="appointment_history.php"><i class="fa-solid fa-calendar-check"></i> Appointments</a>
                     <a href="order_history.php"><i class="fa-solid fa-box"></i> Order History</a>
                     <a href="promo_history.php"><i class="fa-solid fa-box"></i> Promo History</a>
-                    <a href="logout.php" class="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Log Out</a>
+                    <form method="POST" action="logout.php">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                        <button type="submit" class="logout-link" style="border: 0; background: none; cursor: pointer; font: inherit;"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+                    </form>
                 </div>
             </div>
 
@@ -85,6 +87,25 @@ window.addEventListener('click', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
+    const navToggle = document.getElementById('nav-toggle-btn');
+    const mainNav = document.getElementById('main-nav');
+
+    if (navToggle && mainNav) {
+        navToggle.addEventListener('click', function() {
+            const isOpen = navToggle.classList.toggle('open');
+            mainNav.classList.toggle('open', isOpen);
+            navToggle.setAttribute('aria-expanded', String(isOpen));
+        });
+
+        mainNav.querySelectorAll('a').forEach(function(link) {
+            link.addEventListener('click', function() {
+                navToggle.classList.remove('open');
+                mainNav.classList.remove('open');
+                navToggle.setAttribute('aria-expanded', 'false');
+            });
+        });
+    }
+
     const currentPage = window.location.pathname.split('/').pop() || 'index.php';
 
     document.querySelectorAll('.main-nav a').forEach(function(link) {

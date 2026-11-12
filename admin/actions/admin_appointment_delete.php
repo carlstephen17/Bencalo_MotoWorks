@@ -1,20 +1,21 @@
 <?php
-session_start();
-
+require_once '../../includes/auth.php';
 require_once '../../includes/config.php';
 /** @var PDO $pdo */
-require_once '../../includes/auth.php';
 
 if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     header('Location: ../../login.php');
     exit();
 }
 
-$appointment_id = filter_input(
-    INPUT_GET,
-    'id',
-    FILTER_VALIDATE_INT
-);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../admin_appointment.php');
+    exit();
+}
+
+requireValidCSRFToken();
+
+$appointment_id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
 if (!$appointment_id) {
     header(
@@ -26,8 +27,7 @@ if (!$appointment_id) {
 try {
 
     $stmt = $pdo->prepare("
-        DELETE FROM service_bookings
-        WHERE id = ?
+        DELETE FROM service_booking WHERE bookingId = ?
     ");
 
     $stmt->execute([$appointment_id]);
@@ -39,11 +39,7 @@ try {
     exit();
 
 } catch (PDOException $e) {
-
-    header(
-        'Location: ../admin_appointment.php?msg=' .
-        urlencode('Failed to delete appointment: ' . $e->getMessage())
-    );
+    error_log('Appointment deletion failed: ' . $e->getMessage());
+    header('Location: ../admin_appointment.php?msg=' . urlencode('Failed to delete appointment.'));
     exit();
 }
-?>

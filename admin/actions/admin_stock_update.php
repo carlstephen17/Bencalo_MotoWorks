@@ -1,57 +1,61 @@
 <?php
 // /admin/actions/admin_stock_update.php
-session_start();
-require_once '../includes/config.php';
+require_once '../../includes/auth.php';
+require_once '../../includes/config.php';
 /** @var PDO $pdo */
-require_once '../includes/auth.php';
 
 if (!isset($_SESSION['user_id']) || !isAdmin($_SESSION['user_id'])) {
     header('Location: ../../login.php');
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['csrf_token'] ?? '';
-    if (!verifyCSRFToken($token)) {
-        header('Location: ../admin_inventory.php?msg=Invalid+Security+Token');
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../admin_products.php');
+    exit();
+}
+requireValidCSRFToken();
+
+$productId = filter_input(INPUT_POST, 'product_id', FILTER_VALIDATE_INT);
+$actionType = $_POST['action_type'] ?? '';
+$quantity = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
+if (!$productId || $productId < 1 || $quantity === false || $quantity < 0 || $quantity > 1000000 || !in_array($actionType, ['add', 'subtract', 'set'], true)) {
+    header('Location: ../admin_products.php?msg=' . urlencode('Invalid stock parameters.'));
+    exit();
+}
+
+$pdo->beginTransaction();
+try {
+    $stmt = $pdo->prepare('SELECT productStock FROM product WHERE productId = ? FOR UPDATE');
+    $stmt->execute([$productId]);
+    $currentStock = $stmt->fetchColumn();
+    if ($currentStock === false) {
+        $pdo->rollBack();
+        header('Location: ../admin_products.php?msg=' . urlencode('Product not found.'));
         exit();
     }
 
-    $productId = filter_input(INPUT_POST, 'product_id', FILTER_VALIDATE_INT);
-    $actionType = $_POST['action_type'] ?? '';
-    $quantity = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
-
-    if ($productId && $quantity !== false && $quantity >= 0) {
-        // Fetch current stock first
-        $stmt = $pdo->prepare("SELECT stock FROM products WHERE id = ?");
-        $stmt->execute([$productId]);
-        $product = $stmt->fetch();
-
-        if ($product) {
-            $currentStock = (int)$product['stock'];
-            $newStock = $currentStock;
-
-            if ($actionType === 'add') {
-                $newStock = $currentStock + $quantity;
-            } elseif ($actionType === 'subtract') {
-                $newStock = max(0, $currentStock - $quantity); // Prevent negative stock
-            } elseif ($actionType === 'set') {
-                $newStock = $quantity;
-            }
-
-            // Update database
-            $updateStmt = $pdo->prepare("UPDATE products SET stock = ? WHERE id = ?");
-            $updateStmt->execute([$newStock, $productId]);
-
-            header('Location: ../admin_inventory.php?msg=Stock+successfully+updated');
-            exit();
-        }
+    $newStock = match ($actionType) {
+        'add' => (int) $currentStock + $quantity,
+        'subtract' => max(0, (int) $currentStock - $quantity),
+        default => $quantity,
+    };
+    if ($newStock > 2147483647) {
+        $pdo->rollBack();
+        header('Location: ../admin_products.php?msg=' . urlencode('Stock exceeds the allowed maximum.'));
+        exit();
     }
 
-    header('Location: ../admin_inventory.php?msg=Invalid+stock+parameters');
-    exit();
-} else {
-    header('Location: ../admin_inventory.php');
+    $updateStmt = $pdo->prepare('UPDATE product SET productStock = ? WHERE productId = ?');
+    $updateStmt->execute([$newStock, $productId]);
+    $pdo->commit();
+} catch (Throwable $error) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    error_log('Stock update failed: ' . $error->getMessage());
+    header('Location: ../admin_products.php?msg=' . urlencode('Unable to update stock. Please try again.'));
     exit();
 }
-?>
+
+header('Location: ../admin_products.php?msg=' . urlencode('Stock successfully updated.'));
+exit();

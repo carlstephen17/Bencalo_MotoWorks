@@ -1,24 +1,30 @@
 <?php
 // promo_history.php - Promo claim and appointment history
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
+require_once 'includes/config.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
-require_once 'includes/config.php';
-
 $userId = intval($_SESSION['user_id']);
-$isAdmin = $_SESSION['is_admin'] ?? false;
-
-// Generate CSRF Token for modals/forms if not set
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+if (isAdmin($userId)) {
+    header('Location: admin/admin_promo_history.php');
+    exit;
 }
+if (isStaff($userId)) {
+    header('Location: staff/staff_index.php');
+    exit;
+}
+if (!hasRole($userId, 'customer')) {
+    header('Location: login.php');
+    exit;
+}
+$isAdmin = false;
+
+$csrfToken = generateCSRFToken();
 
 // Session fallback details
 $sessionUserName =
@@ -37,34 +43,22 @@ $sessionUserPhone =
 // DELETE CLAIM
 // ----------------------------------------------------
 if (
-    isset($_GET['action']) &&
-    $_GET['action'] === 'delete' &&
-    isset($_GET['id'])
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    ($_POST['action'] ?? '') === 'delete_claim'
 ) {
-    $claimId = intval($_GET['id']);
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        exit('Invalid security token. Refresh the page and try again.');
+    }
+    $claimId = filter_input(INPUT_POST, 'claim_id', FILTER_VALIDATE_INT);
 
-    if ($claimId > 0) {
-
-        if ($isAdmin) {
-            $stmt = $pdo->prepare("
-                DELETE FROM promo_claims
-                WHERE id = ?
-            ");
-
-            $stmt->execute([$claimId]);
-
-        } else {
-            $stmt = $pdo->prepare("
-                DELETE FROM promo_claims
-                WHERE id = ?
-                AND users_id = ?
-            ");
-
-            $stmt->execute([
-                $claimId,
-                $userId
-            ]);
-        }
+    if ($claimId && $claimId > 0) {
+        $table = ($_POST['record_type'] ?? '') === 'promo_claim' ? 'promo_claim' : 'service_booking';
+        $sql = $table === 'promo_claim'
+            ? 'DELETE FROM promo_claim WHERE claimId = ? AND userId = ?'
+            : 'DELETE FROM service_booking WHERE bookingId = ? AND userId = ? AND bookingBundleSlug IS NOT NULL';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$claimId, $userId]);
     }
 
     header('Location: promo_history.php');
@@ -77,40 +71,77 @@ if (
 if ($isAdmin) {
 
     $stmt = $pdo->query("
-        SELECT pc.*, 
-               u.username,
-               u.first_name,
-               u.last_name,
-               u.email
-        FROM promo_claims pc
-        LEFT JOIN users u
-            ON pc.users_id = u.id
-        ORDER BY pc.appointment_date ASC,
-                 pc.appointment_time ASC,
-                 pc.id DESC
+         SELECT sb.bookingId as id, sb.bookingId, sb.userId as user_id, sb.userId as users_id, sb.serviceId as service_id, sb.bookingVehicleModel as vehicle_model, sb.bookingDate as booking_date, sb.bookingDate as appointment_date, sb.bookingTime as booking_time, sb.bookingTime as appointment_time, sb.bookingBundleSlug as bundle_slug, sb.bookingBundleOption as bundle_option, sb.bookingBundleOption as selected_option, sb.bookingStatus as status, sb.bookingNotes as notes, sb.bookingCreatedAt as created_at, CONCAT_WS(' ', u.userFirstName, u.userLastName) AS fullname, u.userPhone as phone, u.userId as users_id, u.username, u.userFirstName as first_name, u.userLastName as last_name, u.userEmail as email FROM service_booking sb INNER JOIN user u ON sb.userId = u.userId WHERE sb.bookingBundleSlug IS NOT NULL
+         ORDER BY sb.bookingDate ASC,
+               sb.bookingTime ASC,
+               sb.bookingId DESC
     ");
 
 } else {
 
     $stmt = $pdo->prepare("
-        SELECT pc.*, 
-               u.username,
-               u.first_name,
-               u.last_name,
-               u.email
-        FROM promo_claims pc
-        LEFT JOIN users u
-            ON pc.users_id = u.id
-        WHERE pc.users_id = ?
-        ORDER BY pc.appointment_date ASC,
-                 pc.appointment_time ASC,
-                 pc.id DESC
+         SELECT sb.*,
+               sb.bookingBundleSlug AS bundle_slug,
+               sb.bookingBundleOption AS selected_option,
+             sb.bookingDate AS appointment_date,
+             sb.bookingTime AS appointment_time,
+             CONCAT_WS(' ', u.userFirstName, u.userLastName) AS fullname,
+             u.userPhone AS phone,
+             u.userId AS users_id,
+             u.username,
+               u.userFirstName AS first_name,
+               u.userLastName AS last_name,
+               u.userEmail AS email
+         FROM service_booking sb
+         INNER JOIN user u ON sb.userId = u.userId
+         WHERE sb.userId = ?
+          AND sb.bookingBundleSlug IS NOT NULL
+         ORDER BY sb.bookingDate ASC,
+               sb.bookingTime ASC,
+               sb.bookingId DESC
     ");
 
     $stmt->execute([$userId]);
 }
 
 $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($claims as &$claim) {
+    $claim['record_type'] = 'service_booking';
+}
+unset($claim);
+
+$promoClaimStmt = $pdo->prepare("
+    SELECT pc.claimId AS id, pc.userId AS users_id, pc.claimFullName AS fullname, pc.claimPhone AS phone,
+           pc.claimBundleSlug AS bundle_slug, pc.claimSelectedOption AS selected_option,
+           pc.claimAppointmentDate AS appointment_date, pc.claimAppointmentTime AS appointment_time,
+           pc.claimStatus AS status, pc.claimCreatedAt AS created_at,
+           u.username, u.userFirstName AS first_name, u.userLastName AS last_name
+    FROM promo_claim pc
+    LEFT JOIN `user` u ON pc.userId = u.userId
+    WHERE pc.userId = ?
+");
+$promoClaimStmt->execute([$userId]);
+$promoClaims = $promoClaimStmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($promoClaims as &$claim) {
+    $claim['record_type'] = 'promo_claim';
+}
+unset($claim);
+
+$claims = array_merge($claims, $promoClaims);
+usort($claims, static function (array $first, array $second): int {
+    $dateComparison = strcmp(
+        (string) ($first['appointment_date'] ?? ''),
+        (string) ($second['appointment_date'] ?? '')
+    );
+    if ($dateComparison !== 0) {
+        return $dateComparison;
+    }
+
+    return strcmp(
+        (string) ($first['appointment_time'] ?? ''),
+        (string) ($second['appointment_time'] ?? '')
+    );
+});
 ?>
 
 <!DOCTYPE html>
@@ -293,14 +324,13 @@ $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     Edit
                                 </button>
 
-                                <a
-                                    href="promo_history.php?action=delete&id=<?= (int)$claim['id'] ?>"
-                                    class="btn-cancel"
-                                    onclick="return confirm('Are you sure you want to cancel and delete this promo claim?');"
-                                >
-                                    <i class="fa-solid fa-trash"></i>
-                                    Cancel
-                                </a>
+                                <form method="POST" action="promo_history.php" style="display:inline" onsubmit="return confirm('Are you sure you want to cancel and delete this promo claim?');">
+                                    <input type="hidden" name="action" value="delete_claim">
+                                    <input type="hidden" name="claim_id" value="<?= (int) $claim['id'] ?>">
+                                    <input type="hidden" name="record_type" value="<?= htmlspecialchars($claim['record_type'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                                    <button type="submit" class="btn-cancel"><i class="fa-solid fa-trash"></i> Cancel</button>
+                                </form>
 
                             </div>
 
@@ -447,7 +477,7 @@ $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <input
                 type="hidden"
                 name="csrf_token"
-                value="<?= $_SESSION['csrf_token'] ?>"
+                value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"
             >
 
             <div style="margin-bottom:15px;">
@@ -535,19 +565,19 @@ $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     "
                 >
 
-                    <option value="09:00 AM - 10:30 AM">
+                    <option value="09:00:00">
                         09:00 AM - 10:30 AM
                     </option>
 
-                    <option value="10:30 AM - 12:00 PM">
+                    <option value="10:30:00">
                         10:30 AM - 12:00 PM
                     </option>
 
-                    <option value="01:00 PM - 02:30 PM">
+                    <option value="13:00:00">
                         01:00 PM - 02:30 PM
                     </option>
 
-                    <option value="04:00 PM - 05:30 PM">
+                    <option value="16:00:00">
                         04:00 PM - 05:30 PM
                     </option>
 
@@ -739,7 +769,7 @@ function openEditModal(claim) {
         claim.appointment_date || '';
 
     document.getElementById('editTime').value =
-        claim.appointment_time || '09:00 AM - 10:30 AM';
+        claim.appointment_time || '09:00:00';
 
     if (isAdminUser) {
         const statusSelect = document.getElementById('editStatus');

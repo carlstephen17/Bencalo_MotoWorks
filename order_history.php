@@ -1,10 +1,8 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
+require_once __DIR__ . '/includes/auth.php';
 require_once 'includes/config.php';
+require_once __DIR__ . '/includes/orders.php';
 
 // Normalize database connection object
 if (!isset($pdo) && isset($conn)) {
@@ -22,6 +20,19 @@ if (!$userId) {
     header('Location: login.php');
     exit;
 }
+if (isAdmin((int) $userId)) {
+    header('Location: admin/admin_orders.php');
+    exit;
+}
+if (isStaff((int) $userId)) {
+    header('Location: staff/staff_index.php');
+    exit;
+}
+if (!hasRole((int) $userId, 'customer')) {
+    header('Location: login.php');
+    exit;
+}
+generateCSRFToken();
 
 // Load functions/auth helpers if available
 if (file_exists('includes/functions.php')) {
@@ -41,9 +52,13 @@ $messageType = '';
 |--------------------------------------------------------------------------
 */
 
-if (isset($_GET['delete_id']) && isset($pdo)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_order' && isset($pdo)) {
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        exit('Invalid security token. Refresh the page and try again.');
+    }
 
-    $deleteId = filter_input(INPUT_GET, 'delete_id', FILTER_VALIDATE_INT);
+    $deleteId = filter_input(INPUT_POST, 'delete_id', FILTER_VALIDATE_INT);
 
     if ($deleteId) {
 
@@ -51,14 +66,10 @@ if (isset($_GET['delete_id']) && isset($pdo)) {
 
             $pdo->beginTransaction();
 
-            // IMPORTANT:
-            // Orders table uses users_id and products_id
             $stmt = $pdo->prepare("
-                SELECT products_id, quantity
-                FROM orders
-                WHERE id = ?
-                  AND users_id = ?
-                  AND status = 'Pending'
+                SELECT orderGroupId
+                FROM customer_order
+                WHERE orderGroupId = ? AND userId = ? AND orderStatus = 'Pending'
                 FOR UPDATE
             ");
 
@@ -67,49 +78,9 @@ if (isset($_GET['delete_id']) && isset($pdo)) {
             $orderToCancel = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($orderToCancel) {
-
-                // Delete only this user's pending order
-                $stmtDel = $pdo->prepare("
-                    DELETE FROM orders
-                    WHERE id = ?
-                      AND users_id = ?
-                      AND status = 'Pending'
-                ");
-
-                $stmtDel->execute([$deleteId, $userId]);
-
-                if ($stmtDel->rowCount() > 0) {
-
-                    // Restore stock
-                    if (
-                        !empty($orderToCancel['products_id']) &&
-                        (int)$orderToCancel['quantity'] > 0
-                    ) {
-
-                        $updateStock = $pdo->prepare("
-                            UPDATE products
-                            SET stock = stock + ?
-                            WHERE id = ?
-                        ");
-
-                        $updateStock->execute([
-                            (int)$orderToCancel['quantity'],
-                            (int)$orderToCancel['products_id']
-                        ]);
-                    }
-
-                    $pdo->commit();
-
-                    $message = "Order successfully cancelled and inventory restored.";
-                    $messageType = "success";
-
-                } else {
-
-                    $pdo->rollBack();
-
-                    $message = "Cannot cancel this order. It may already be processed or completed.";
-                    $messageType = "error";
-                }
+                $message = updateCustomerOrderStatus($pdo, (int) $deleteId, 'Cancelled', 'Cancelled by customer');
+                $pdo->commit();
+                $messageType = "success";
 
             } else {
 
@@ -125,7 +96,8 @@ if (isset($_GET['delete_id']) && isset($pdo)) {
                 $pdo->rollBack();
             }
 
-            $message = "Error cancelling order: " . $e->getMessage();
+            error_log('Order cancellation failed: ' . $e->getMessage());
+            $message = 'Unable to cancel this order right now.';
             $messageType = "error";
         }
     }
@@ -143,6 +115,10 @@ if (
     $_POST['action'] === 'edit_order' &&
     isset($pdo)
 ) {
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        exit('Invalid security token. Refresh the page and try again.');
+    }
 
     $orderId = filter_input(
         INPUT_POST,
@@ -150,8 +126,6 @@ if (
         FILTER_VALIDATE_INT
     );
 
-    $fullName = trim($_POST['full_name'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
     $address = trim($_POST['address'] ?? '');
     $quantity = filter_input(
         INPUT_POST,
@@ -161,8 +135,6 @@ if (
 
     if (
         !$orderId ||
-        empty($fullName) ||
-        empty($phone) ||
         empty($address) ||
         !$quantity ||
         $quantity < 1
@@ -181,21 +153,16 @@ if (
             |--------------------------------------------------------------------------
             | Get existing order
             |--------------------------------------------------------------------------
-            | IMPORTANT:
-            | users_id and products_id match process_checkout.php
             */
 
             $checkStmt = $pdo->prepare("
-                SELECT
-                    o.*,
-                    p.price AS product_price,
-                    p.stock AS current_stock
-                FROM orders o
-                LEFT JOIN products p
-                    ON o.products_id = p.id
-                WHERE o.id = ?
-                  AND o.users_id = ?
-                  AND o.status = 'Pending'
+                SELECT o.*, o.orderId as id, o.orderQuantity as quantity, o.orderTotalAmount as total_amount,
+                       o.productId as product_id, COALESCE(o.orderUnitPrice, p.productPrice) AS product_price,
+                       p.productStock AS current_stock, co.orderStatus AS group_status
+                FROM `order` o
+                INNER JOIN customer_order co ON co.orderGroupId = o.orderGroupId
+                LEFT JOIN product p ON o.productId = p.productId
+                WHERE o.orderId = ? AND o.userId = ? AND co.orderStatus = 'Pending'
                 FOR UPDATE
             ");
 
@@ -261,27 +228,23 @@ if (
                     */
 
                     $stmt = $pdo->prepare("
-                        UPDATE orders
-                        SET
-                            full_name = ?,
-                            phone = ?,
-                            address = ?,
-                            quantity = ?,
-                            total_amount = ?
-                        WHERE id = ?
-                          AND users_id = ?
-                          AND status = 'Pending'
+                        UPDATE `order`
+                        SET orderQuantity = ?, orderTotalAmount = ?, orderUnitPrice = ?
+                        WHERE orderId = ? AND userId = ? AND orderStatus = 'Pending'
                     ");
 
                     $stmt->execute([
-                        $fullName,
-                        $phone,
-                        $address,
                         $quantity,
                         $newTotalAmount,
+                        $unitPrice,
                         $orderId,
                         $userId
                     ]);
+
+                    $userAddressStmt = $pdo->prepare('UPDATE `user` SET userAddress = ? WHERE userId = ?');
+                    $userAddressStmt->execute([$address, $userId]);
+                    $deliveryAddressStmt = $pdo->prepare('UPDATE customer_order SET orderDeliveryAddress = ? WHERE orderGroupId = ? AND userId = ? AND orderStatus = \'Pending\'');
+                    $deliveryAddressStmt->execute([$address, (int) $existingOrder['orderGroupId'], $userId]);
 
                     /*
                     |--------------------------------------------------------------------------
@@ -303,25 +266,24 @@ if (
 
                     if (
                         $quantityDiff !== 0 &&
-                        !empty($existingOrder['products_id'])
+                        !empty($existingOrder['product_id'])
                     ) {
 
                         $updateStock = $pdo->prepare("
-                            UPDATE products
-                            SET stock = stock - ?
-                            WHERE id = ?
+                            UPDATE product SET productStock = productStock - ? WHERE productId = ?
                         ");
 
                         $updateStock->execute([
                             $quantityDiff,
-                            (int)$existingOrder['products_id']
+                            (int)$existingOrder['product_id']
                         ]);
                     }
 
                     $pdo->commit();
 
+                    $groupId = (int) $existingOrder['orderGroupId'];
                     $message =
-                        "Order #{$orderId} updated successfully!";
+                        "Order #{$groupId} updated successfully!";
 
                     $messageType = "success";
                 }
@@ -346,12 +308,7 @@ if (
 | Fetch User's Orders
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
-| This directly queries the orders table using:
-|   orders.users_id
-|   orders.products_id
-|
-| This matches process_checkout.php.
+ * Customer identity and delivery address are read from the users profile.
 |--------------------------------------------------------------------------
 */
 
@@ -362,16 +319,25 @@ if (isset($pdo)) {
     try {
 
         $stmt = $pdo->prepare("
-            SELECT
-                o.*,
-                p.name AS product_name,
-                p.image AS product_image,
-                p.price AS product_price
-            FROM orders o
-            LEFT JOIN products p
-                ON o.products_id = p.id
-            WHERE o.users_id = ?
-            ORDER BY o.id ASC
+            SELECT o.orderId as id, co.orderGroupId, o.userId, o.userId as user_id,
+                   o.productId, o.productId as product_id, o.orderQuantity as quantity,
+                   o.orderQuantity, o.orderTotalAmount as total_amount, o.orderTotalAmount,
+                   co.orderPaymentMethod as payment_method, co.orderPaymentMethod,
+                   co.orderPaymentReference as payment_reference, co.orderPaymentReference,
+                   co.orderPaymentStatus as payment_status,
+                   co.orderStatus as status, co.orderStatus,
+                   co.orderCreatedAt as created_at, co.orderCreatedAt,
+                   co.orderDeliveryAddress AS address, co.orderDeliveryAddress,
+                   CONCAT_WS(' ', u.userFirstName, u.userLastName) AS full_name,
+                   u.userPhone AS phone, p.productName AS product_name,
+                   p.productImage AS product_image,
+                   COALESCE(o.orderUnitPrice, p.productPrice) AS product_price
+            FROM `order` o
+            INNER JOIN customer_order co ON co.orderGroupId = o.orderGroupId
+            INNER JOIN user u ON o.userId = u.userId
+            LEFT JOIN product p ON o.productId = p.productId
+            WHERE o.userId = ?
+            ORDER BY co.orderGroupId ASC, o.orderId ASC
         ");
 
         $stmt->execute([$userId]);
@@ -518,7 +484,7 @@ if (file_exists('components/header.php')) {
                         <tr>
 
                             <td>
-                                #<?= (int)$ord['id'] ?>
+                                #<?= (int)$ord['orderGroupId'] ?>
                             </td>
 
 
@@ -608,7 +574,7 @@ if (file_exists('components/header.php')) {
                                         type="button"
                                         class="btn-row-action btn-view"
                                         onclick="openViewModal(
-                                            <?= (int)$ord['id'] ?>,
+                                            <?= (int)$ord['orderGroupId'] ?>,
                                             <?= htmlspecialchars(
                                                 json_encode($productName),
                                                 ENT_QUOTES,
@@ -695,6 +661,7 @@ if (file_exists('components/header.php')) {
                                             class="btn-row-action btn-edit"
                                             onclick="openEditModal(
                                                 <?= (int)$ord['id'] ?>,
+                                                <?= (int)$ord['orderGroupId'] ?>,
                                                 <?= htmlspecialchars(
                                                     json_encode(
                                                         $ord['full_name'] ?? ''
@@ -727,23 +694,15 @@ if (file_exists('components/header.php')) {
 
                                         <!-- CANCEL -->
 
-                                        <button
-                                            type="button"
-                                            class="btn-row-action btn-cancel"
-                                            onclick="
-                                                if (
-                                                    confirm(
-                                                        'Are you sure you want to cancel and delete this order?'
-                                                    )
-                                                ) {
-                                                    window.location.href =
-                                                        'order_history.php?delete_id=<?= (int)$ord['id'] ?>';
-                                                }
-                                            "
-                                        >
-                                            <i class="fa-solid fa-trash"></i>
-                                            Cancel
-                                        </button>
+                                        <form method="POST" action="order_history.php" style="display:inline" onsubmit="return confirm('Cancel this complete order? Its stock will be restored and the order record retained.');">
+                                            <input type="hidden" name="action" value="delete_order">
+                                            <input type="hidden" name="delete_id" value="<?= (int) $ord['orderGroupId'] ?>">
+                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                            <button type="submit" class="btn-row-action btn-cancel">
+                                                <i class="fa-solid fa-trash"></i>
+                                                Cancel
+                                            </button>
+                                        </form>
 
                                     <?php endif; ?>
 
@@ -970,6 +929,7 @@ if (file_exists('components/header.php')) {
             action="order_history.php"
             method="POST"
         >
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
 
             <input
                 type="hidden"
@@ -993,9 +953,8 @@ if (file_exists('components/header.php')) {
                 <input
                     type="text"
                     id="modalFullName"
-                    name="full_name"
                     class="modal-form-control"
-                    required
+                    readonly
                 >
 
             </div>
@@ -1010,9 +969,8 @@ if (file_exists('components/header.php')) {
                 <input
                     type="text"
                     id="modalPhone"
-                    name="phone"
                     class="modal-form-control"
-                    required
+                    readonly
                 >
 
             </div>
@@ -1191,6 +1149,7 @@ function closeViewModal() {
 
 function openEditModal(
     id,
+    displayId,
     fullName,
     phone,
     address,
@@ -1202,7 +1161,7 @@ function openEditModal(
         id;
 
     document.getElementById('modalOrderIdDisplay').innerText =
-        '#' + id;
+        '#' + displayId;
 
     document.getElementById('modalFullName').value =
         fullName;

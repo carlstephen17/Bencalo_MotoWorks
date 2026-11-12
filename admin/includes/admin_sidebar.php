@@ -24,6 +24,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <li class="<?= ($current_page === 'admin_appointment.php') ? 'active' : '' ?>">
             <a href="admin_appointment.php"><i class="fas fa-calendar-check"></i> Appointments</a>
         </li>
+
         <li class="<?= ($current_page === 'admin_promos.php') ? 'active' : '' ?>">
             <a href="admin_promos.php"><i class="fas fa-tags"></i> Promo</a>
         </li>
@@ -34,7 +35,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <a href="admin_users.php"><i class="fas fa-users"></i> Users</a>
         </li>
         <li>
-            <a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            <form method="POST" action="../logout.php">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>">
+                <button type="submit" style="border:0;background:none;color:inherit;cursor:pointer;font:inherit;padding:12px 16px;"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </form>
         </li>
     </ul>
 </aside>

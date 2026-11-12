@@ -1,8 +1,7 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
+generateCSRFToken();
 
 /*
 |--------------------------------------------------------------------------
@@ -59,6 +58,18 @@ if (!$user_id) {
     header('Location: login.php');
     exit();
 }
+if (isAdmin((int) $user_id)) {
+    header('Location: admin/admin_appointment.php');
+    exit();
+}
+if (isStaff((int) $user_id)) {
+    header('Location: staff/staff_index.php');
+    exit();
+}
+if (!hasRole((int) $user_id, 'customer')) {
+    header('Location: login.php');
+    exit();
+}
 
 $feedback = '';
 
@@ -74,6 +85,10 @@ if (
     isset($_POST['crud_action']) &&
     isset($pdo)
 ) {
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? null)) {
+        header('Location: appointment_history.php?msg=error');
+        exit();
+    }
 
     $action = $_POST['crud_action'];
 
@@ -92,14 +107,11 @@ if (
             FILTER_VALIDATE_INT
         );
 
-        $services_id = filter_input(
+        $service_id = filter_input(
             INPUT_POST,
-            'services_id',
+            'service_id',
             FILTER_VALIDATE_INT
         );
-
-        $contact_number =
-            trim($_POST['contact_number'] ?? '');
 
         $vehicle_model =
             trim($_POST['vehicle_model'] ?? '');
@@ -113,32 +125,29 @@ if (
         $notes =
             trim($_POST['notes'] ?? '');
 
+        if (!$booking_id || !$service_id || $vehicle_model === '' || mb_strlen($vehicle_model) > 255 || mb_strlen($notes) > 2000) {
+            header('Location: appointment_history.php?msg=error');
+            exit();
+        }
+
 
         try {
 
             /*
             |--------------------------------------------------------------------------
-            | IMPORTANT:
-            | service_bookings uses services_id
+            | Customer contact is read from the users profile.
             |--------------------------------------------------------------------------
             */
 
             $stmt = $pdo->prepare("
-                UPDATE service_bookings
-                SET
-                    services_id = ?,
-                    contact_number = ?,
-                    vehicle_model = ?,
-                    booking_date = ?,
-                    booking_time = ?,
-                    notes = ?
-                WHERE id = ?
-                  AND user_id = ?
+                UPDATE service_booking
+                SET serviceId = ?, bookingVehicleModel = ?, bookingDate = ?, bookingTime = ?, bookingNotes = ?
+                WHERE bookingId = ? AND userId = ?
+                  AND COALESCE(LOWER(TRIM(bookingStatus)), '') <> 'completed'
             ");
 
             $stmt->execute([
-                $services_id,
-                $contact_number,
+                $service_id,
                 $vehicle_model,
                 $booking_date,
                 $booking_time,
@@ -147,7 +156,16 @@ if (
                 $user_id
             ]);
 
-            $feedback = 'updated';
+            if ($stmt->rowCount() > 0) {
+                $feedback = 'updated';
+            } else {
+                $statusStmt = $pdo->prepare('SELECT bookingStatus FROM service_booking WHERE bookingId = ? AND userId = ?');
+                $statusStmt->execute([$booking_id, $user_id]);
+                $currentStatus = $statusStmt->fetchColumn();
+                $feedback = $currentStatus !== false && strtolower(trim((string) $currentStatus)) === 'completed'
+                    ? 'completed'
+                    : ($currentStatus === false ? 'error' : 'updated');
+            }
 
         } catch (PDOException $e) {
 
@@ -173,9 +191,7 @@ if (
         try {
 
             $stmt = $pdo->prepare("
-                DELETE FROM service_bookings
-                WHERE id = ?
-                  AND user_id = ?
+                DELETE FROM service_booking WHERE bookingId = ? AND userId = ?
             ");
 
             $stmt->execute([
@@ -208,9 +224,9 @@ if (
 |
 | Directly joins:
 |
-| service_bookings.services_id
+| service_booking.serviceId
 |            ↓
-|       services.id
+|       service.serviceId
 |
 | This prevents N/A when the service relationship is valid.
 |--------------------------------------------------------------------------
@@ -230,15 +246,7 @@ if (isset($pdo)) {
         */
 
         $stmt = $pdo->prepare("
-            SELECT
-                sb.*,
-                s.name AS service_name,
-                s.price AS service_price
-            FROM service_bookings sb
-            LEFT JOIN services s
-                ON sb.services_id = s.id
-            WHERE sb.user_id = ?
-            ORDER BY sb.id DESC
+            SELECT sb.bookingId as id, sb.bookingId, sb.userId as user_id, sb.userId, sb.serviceId as service_id, sb.serviceId as services_id, sb.serviceId, sb.bookingVehicleModel as vehicle_model, sb.bookingDate as booking_date, sb.bookingTime as booking_time, sb.bookingBundleSlug as bundle_slug, sb.bookingBundleOption as bundle_option, sb.bookingStatus as status, sb.bookingNotes as notes, sb.bookingCreatedAt as created_at, u.userPhone as contact_number, NULL as booking_reference, s.serviceName as service_name, s.servicePrice as service_price FROM service_booking sb INNER JOIN service s ON sb.serviceId = s.serviceId INNER JOIN user u ON sb.userId = u.userId WHERE sb.userId = ? ORDER BY sb.bookingId DESC
         ");
 
         $stmt->execute([
@@ -256,13 +264,9 @@ if (isset($pdo)) {
         */
 
         $stmtServices = $pdo->query("
-            SELECT
-                id,
-                name,
-                price
-            FROM services
-            WHERE active = 1
-            ORDER BY id ASC
+            SELECT serviceId as id, serviceName as name, servicePrice as price, serviceId, serviceName, servicePrice FROM service
+            WHERE serviceActive = 1
+            ORDER BY serviceId ASC
         ");
 
         $services_list =
@@ -352,6 +356,10 @@ if (isset($pdo)) {
 
             if ($_GET['msg'] === 'updated') {
                 echo "Appointment updated successfully!";
+            }
+
+            if ($_GET['msg'] === 'completed') {
+                echo "Completed appointments cannot be edited.";
             }
 
             if ($_GET['msg'] === 'deleted') {
@@ -793,6 +801,12 @@ if (isset($pdo)) {
 
                                         <input
                                             type="hidden"
+                                            name="csrf_token"
+                                            value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>"
+                                        >
+
+                                        <input
+                                            type="hidden"
                                             name="crud_action"
                                             value="delete"
                                         >
@@ -1049,6 +1063,12 @@ if (isset($pdo)) {
 
             <input
                 type="hidden"
+                name="csrf_token"
+                value="<?= htmlspecialchars(generateCSRFToken(), ENT_QUOTES, 'UTF-8') ?>"
+            >
+
+            <input
+                type="hidden"
                 name="crud_action"
                 value="update"
             >
@@ -1068,7 +1088,7 @@ if (isset($pdo)) {
                 </label>
 
                 <select
-                    name="services_id"
+                    name="service_id"
                     id="edit_services_id"
                     class="form-control"
                     required
@@ -1120,10 +1140,9 @@ if (isset($pdo)) {
 
                 <input
                     type="text"
-                    name="contact_number"
                     id="edit_contact_number"
                     class="form-control"
-                    required
+                    readonly
                 >
 
             </div>
@@ -1159,27 +1178,27 @@ if (isset($pdo)) {
                     required
                 >
 
-                    <option value="09:00 AM - 10:30 AM">
+                    <option value="09:00:00">
                         09:00 AM - 10:30 AM
                     </option>
 
-                    <option value="10:30 AM - 12:00 PM">
+                    <option value="10:30:00">
                         10:30 AM - 12:00 PM
                     </option>
 
-                    <option value="01:30 PM - 03:00 PM">
+                    <option value="13:30:00">
                         01:30 PM - 03:00 PM
                     </option>
 
-                    <option value="02:30 PM - 04:00 PM">
+                    <option value="14:30:00">
                         02:30 PM - 04:00 PM
                     </option>
 
-                    <option value="03:00 PM - 04:30 PM">
+                    <option value="15:00:00">
                         03:00 PM - 04:30 PM
                     </option>
 
-                    <option value="04:00 PM - 05:30 PM">
+                    <option value="16:00:00">
                         04:00 PM - 05:30 PM
                     </option>
 
